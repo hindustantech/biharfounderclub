@@ -31,7 +31,7 @@ app.use(limiter);
 app.use("/api/auth", authRoutes);
 
 app.get("/", (req, res) => {
-    res.send("Hello World!");
+    res.send("bihari founder club API is running");
 });
 
 app.use(errorHandler);
