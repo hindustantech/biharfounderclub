@@ -31,18 +31,13 @@ export const registerUser = async ({
     if (!sendOTP.success) {
         throw Object.assign(new Error("Failed to send WhatsApp OTP"), { statusCode: 500 });
     }
-    const otp = sendOTP?.data?.data;
-
-    if (!otp) {
-        throw Object.assign(new Error("OTP not returned by API", sendOTP), { statusCode: 500 });
-    }
 
     const user = new User({
         fullName,
         whatsappNumber,
         pan,
         password,
-        uid: otp,
+
         otpExpires: new Date(Date.now() + 10 * 60 * 1000) // OTP valid for 10 minutes
     });
 
@@ -51,7 +46,10 @@ export const registerUser = async ({
 
 
 
-    return { message: "User registered, OTP sent to WhatsApp number" };
+    return {
+        message: "User registered, OTP sent to WhatsApp number",
+        data: sendOTP
+    };
 };
 
 
