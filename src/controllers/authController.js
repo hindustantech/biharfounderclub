@@ -17,7 +17,7 @@ export const verifyOtp = async (req, res, next) => {
         const { uid, otp } = req.body;
         logger.info("verifyOtp called with", { uid });
 
-        const result = await verifyWhatsAppOtp(whatsappNumber, otp);
+        const result = await verifyWhatsAppOtp(uid, otp);
         logger.info("verifyOtp result", result);
         if (!result.success) {
             return res.status(400).json({ message: "OTP verification failed", details: result });
