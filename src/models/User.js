@@ -17,7 +17,6 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: [true, "WhatsApp number is required"],
             trim: true,
-            match: [/^\+?\d{10,14}$/, "Please enter a valid WhatsApp number"],
         },
 
         pan: {
@@ -25,12 +24,10 @@ const userSchema = new mongoose.Schema(
             required: [true, "PAN number is required"],
             uppercase: true,
             unique: true,
-            match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Please enter a valid PAN number"],
         },
 
         password: {
             type: String,
-            required: [true, "Password is required"],
             minlength: 8,
         },
 
