@@ -29,6 +29,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+app.set('trust proxy', 1); 
+
+
 app.use("/api/auth", authRoutes);
 app.use("/api/profileRoute", profileRoute);
 app.use("/api/whiteboardroute", whiteboardroute);
