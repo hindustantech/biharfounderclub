@@ -31,7 +31,7 @@ export const registerUser = async ({
     if (!sendOTP.success) {
         throw Object.assign(new Error("Failed to send WhatsApp OTP"), { statusCode: 500 });
     }
-    const otp = sendOTP?.data;
+    const otp = sendOTP?.data?.data;
 
     if (!otp) {
         throw Object.assign(new Error("OTP not returned by API", sendOTP), { statusCode: 500 });
