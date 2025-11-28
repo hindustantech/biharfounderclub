@@ -115,7 +115,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
 
         // Prepare data object
         const profileData = {
-            user: req.user.id,
+            userId: req.user.id,
             name,
             image,
             dob,
@@ -153,7 +153,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
         // -------------------------
         // CHECK IF PROFILE EXISTS
         // -------------------------
-        let profile = await Profile.findOne({ user: req.user.id });
+        let profile = await Profile.findOne({ userId: req.user.id });
 
         if (!profile) {
             // ------------------------------------
@@ -173,7 +173,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
         // CASE: PROFILE EXISTS → UPDATE IT
         // ------------------------------------
         profile = await Profile.findOneAndUpdate(
-            { user: req.user.id },
+            { userId: req.user.id },
             { $set: profileData },
             { new: true, runValidators: true }
         );
@@ -214,7 +214,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
 
 export const deleteProfile = async (req, res, next) => {
     try {
-        const profile = await Profile.findOneAndDelete({ user: req.user.id });
+        const profile = await Profile.findOneAndDelete({ userId: req.user.id });
         if (!profile) {
             return res.status(404).json({ message: "Profile not found" });
         }
