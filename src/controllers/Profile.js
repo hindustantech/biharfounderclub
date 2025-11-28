@@ -89,10 +89,8 @@ const validateProfileFields = (data) => {
  */
 export const createOrUpdateProfile = async (req, res, next) => {
     try {
-        // Extract fields from body
         const {
             name,
-            image,
             dob,
             nativeAddress,
             currentAddress,
@@ -113,11 +111,20 @@ export const createOrUpdateProfile = async (req, res, next) => {
             availableForMentorship,
         } = req.body;
 
-        // Prepare data object
+        let imageUrl;
+
+        // -------------------------
+        // IMAGE HANDLING
+        // -------------------------
+        if (req.file) {
+            imageUrl = await uploadToCloudinary(req.file.buffer, "profile-images");
+        }
+
+        // prepare data
         const profileData = {
             userId: req.user.id,
             name,
-            image,
+            image: imageUrl, // final URL
             dob,
             nativeAddress,
             currentAddress,
@@ -138,30 +145,17 @@ export const createOrUpdateProfile = async (req, res, next) => {
             availableForMentorship,
         };
 
-        // -------------------------
-        // CUSTOM VALIDATIONS
-        // -------------------------
-        const customErrors = validateProfileFields(profileData);
-        if (customErrors.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Validation failed",
-                errors: customErrors,
-            });
-        }
+        // remove undefined values for clean update
+        Object.keys(profileData).forEach(
+            (key) => profileData[key] === undefined && delete profileData[key]
+        );
 
-        // -------------------------
-        // CHECK IF PROFILE EXISTS
-        // -------------------------
+        // Check existing profile
         let profile = await Profile.findOne({ userId: req.user.id });
 
         if (!profile) {
-            // ------------------------------------
-            // CASE: PROFILE NOT FOUND → CREATE NEW
-            // ------------------------------------
             const newProfile = new Profile(profileData);
             await newProfile.save();
-
             return res.status(201).json({
                 success: true,
                 message: "Profile created successfully",
@@ -169,9 +163,7 @@ export const createOrUpdateProfile = async (req, res, next) => {
             });
         }
 
-        // ------------------------------------
-        // CASE: PROFILE EXISTS → UPDATE IT
-        // ------------------------------------
+        // Update
         profile = await Profile.findOneAndUpdate(
             { userId: req.user.id },
             { $set: profileData },
@@ -183,11 +175,9 @@ export const createOrUpdateProfile = async (req, res, next) => {
             message: "Profile updated successfully",
             data: profile,
         });
-
     } catch (error) {
         console.error("❌ Error in createOrUpdateProfile:", error);
 
-        // Mongoose validation errors
         if (error.name === "ValidationError") {
             return res.status(400).json({
                 success: false,
@@ -196,7 +186,6 @@ export const createOrUpdateProfile = async (req, res, next) => {
             });
         }
 
-        // Duplicate key error
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
