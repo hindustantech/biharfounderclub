@@ -9,7 +9,7 @@ export const generateAccessToken = (user) => {
         return jwt.sign(
             { id: user._id, email: user.email },
             config.jwtSecret,
-            { expiresIn: "15m" }
+         
         );
     } catch (error) {
         logger.error("Error generating access token:", error);
@@ -22,7 +22,7 @@ export const generateRefreshToken = (user) => {
         return jwt.sign(
             { id: user._id },
             config.jwtSecret,
-            { expiresIn: "7d" }
+       
         );
     } catch (error) {
         logger.error("Error generating refresh token:", error);
