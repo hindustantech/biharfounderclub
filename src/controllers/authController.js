@@ -2,7 +2,7 @@
 import { registerUser, loginUser, forgotPassword, changePassword, logoutUser } from "../services/authService.js";
 import { logger } from "../config/logger.js";
 import { verifyWhatsAppOtp } from "../utils/whatapp.js";
-import { generateAccessToken } from "../utils/authUtils.js";
+import { generateAccessToken,generateRefreshToken } from "../utils/authUtils.js";
 import User from "../models/User.js";
 export const register1 = async (req, res, next) => {
     try {
