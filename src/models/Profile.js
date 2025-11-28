@@ -50,11 +50,7 @@ const UserProfile = new mongoose.Schema(
     // When occupation = startup_promoter → required
     supportStageMessage: {
       type: String,
-      minlength: 50,
-      maxlength: 500,
-      required: function () {
-        return this.occupation === "startup_promoter";
-      },
+      
     },
 
     // Membership Type
