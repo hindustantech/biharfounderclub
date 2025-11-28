@@ -2,6 +2,8 @@
 import { registerUser, loginUser, forgotPassword, changePassword, logoutUser } from "../services/authService.js";
 import { logger } from "../config/logger.js";
 import { verifyWhatsAppOtp } from "../utils/whatapp.js";
+import { generateAccessToken } from "../utils/authUtils.js";
+import User from "../models/User.js";
 export const register1 = async (req, res, next) => {
     try {
         const result = await registerUser(req.body);
@@ -14,15 +16,33 @@ export const register1 = async (req, res, next) => {
 
 export const verifyOtp = async (req, res, next) => {
     try {
-        const { uid, otp } = req.body;
+        const { uid, otp, whatsappNumber } = req.body;
         logger.info("verifyOtp called with", { uid });
 
         const result = await verifyWhatsAppOtp(uid, otp);
+
+
+
         logger.info("verifyOtp result", result);
         if (!result.success) {
             return res.status(400).json({ message: "OTP verification failed", details: result });
         }
-        res.status(200).json({ message: "OTP verified successfully" });
+
+
+        const user = await User.findOne({ whatsappNumber });
+
+
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        res.status(200).json({
+            message: "OTP verified successfully",
+            accessToken,
+            refreshToken
+        });
     }
     catch (error) {
         logger.error("Error in verifyOtp:", error);
