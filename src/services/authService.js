@@ -11,6 +11,7 @@ export const registerUser = async ({
     pan,
     password
 }) => {
+
     if (!fullName || !whatsappNumber || !pan || !password) {
         throw new Error("Missing required fields");
     }
@@ -40,7 +41,6 @@ export const registerUser = async ({
         whatsappNumber,
         pan,
         password,
-
         otpExpires: new Date(Date.now() + 10 * 60 * 1000) // OTP valid for 10 minutes
     });
 

@@ -50,7 +50,6 @@ const UserProfile = new mongoose.Schema(
     // When occupation = startup_promoter → required
     supportStageMessage: {
       type: String,
-      
     },
 
     // Membership Type
@@ -62,10 +61,9 @@ const UserProfile = new mongoose.Schema(
 
     // Mentor Fields — required when membershipType = "Mentor"
     mentorshipFields: {
-      type: [String], // max 5
+      type: [String],
       validate: {
         validator: function (val) {
-          // Only validate if mentor
           if (this.membershipType === "Mentor") {
             return val && val.length > 0 && val.length <= 5;
           }
@@ -78,6 +76,14 @@ const UserProfile = new mongoose.Schema(
     previousExperience: {
       type: String,
       maxlength: 100,
+      required: function () {
+        return this.membershipType === "Mentor";
+      },
+    },
+
+    showMentorshipSection: { // Fixed typo from showMentroshipSection
+      type: Boolean,
+      default: false,
       required: function () {
         return this.membershipType === "Mentor";
       },
@@ -99,10 +105,30 @@ const UserProfile = new mongoose.Schema(
       default: false,
     },
 
+    // Toggle to show/hide mentor in mentor list
+    showInMentorSection: {
+      type: Boolean,
+      default: false,
+    },
+
     // Profile Verification
     profileVerified: { type: Boolean, default: false },
+
+    // Soft delete
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );
+
+// Indexes for better query performance
+UserProfile.index({ userId: 1 });
+UserProfile.index({ membershipType: 1 });
+UserProfile.index({ occupation: 1 });
+UserProfile.index({ profileVerified: 1 });
+UserProfile.index({ showInMentorSection: 1 });
+UserProfile.index({ isActive: 1 });
 
 export default mongoose.model("Profile", UserProfile);

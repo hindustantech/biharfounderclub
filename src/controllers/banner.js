@@ -240,6 +240,7 @@ export const getBannerById = async (req, res) => {
  */
 export const updateBanner = async (req, res) => {
     try {
+        
         const { id } = req.params;
         const { title, link, email, phoneNumber, description, isActive } = req.body;
 

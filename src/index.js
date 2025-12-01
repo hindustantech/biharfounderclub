@@ -14,6 +14,7 @@ import profileRoute from "./routes/ProfileRoute.js";
 import whiteboardroute from "./routes/WhiteboardRoute.js";
 import bannerroute from './routes/Bannerroute.js'
 import usermangentroute from './routes/userRoutes.js'
+import adminprofile from './routes/profile.js'
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +40,7 @@ app.use("/api/profileRoute", profileRoute);
 app.use("/api/whiteboardroute", whiteboardroute);
 app.use("/api/bannerroute", bannerroute);
 app.use("/api/usermangentroute", usermangentroute);
+app.use("/api/admin/profiles", adminprofile);
 
 app.get("/", (req, res) => {
     res.send("bihari founder club API is running");
