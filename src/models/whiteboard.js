@@ -1,3 +1,4 @@
+// models/Whiteboard.js
 import mongoose from "mongoose";
 
 const whiteboardSchema = new mongoose.Schema(
@@ -29,8 +30,46 @@ const whiteboardSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+
+        // Admin specific fields
+        status: {
+            type: String,
+            enum: ["pending", "active", "rejected", "archived"],
+            default: "pending",
+            index: true,
+        },
+
+        isFeatured: {
+            type: Boolean,
+            default: false,
+        },
+
+        featuredUntil: {
+            type: Date,
+            default: null,
+        },
+
+        adminNotes: {
+            type: String,
+            maxlength: 1000,
+        },
+
+        // Metadata
+        views: {
+            type: Number,
+            default: 0,
+        },
+
+        lastModifiedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        }
     },
     { timestamps: true }
 );
+
+// Index for better query performance
+whiteboardSchema.index({ status: 1, category: 1 });
+whiteboardSchema.index({ isFeatured: 1, status: 1 });
 
 export default mongoose.model("Whiteboard", whiteboardSchema);
