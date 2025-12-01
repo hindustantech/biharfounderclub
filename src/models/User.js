@@ -11,7 +11,11 @@ const userSchema = new mongoose.Schema(
             maxlength: 80,
         },
 
-
+        role: {
+            type: String,
+            enum: ["user", "admin"],
+            default: "user",
+        },
 
         whatsappNumber: {
             type: String,

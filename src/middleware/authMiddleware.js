@@ -6,22 +6,43 @@ import { logger } from "../config/logger.js";
 
 export const protect = async (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(" ")[1];
-        if (!token) {
-            throw Object.assign(new Error("No token provided"), { statusCode: 401 });
+        // Get token from header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ message: "No token provided, authorization denied" });
         }
 
+        const token = authHeader.split(" ")[1];
+
+        // Verify token
         const decoded = jwt.verify(token, config.jwtSecret);
-        const user = await User.findById(decoded.id).select("-password");
-        
+
+        // Get user from token
+        const user = await User.findById(decoded.id).select("-password -refreshToken");
         if (!user) {
-            throw Object.assign(new Error("Invalid token"), { statusCode: 401 });
+            return res.status(401).json({ message: "User not found, authorization denied" });
         }
 
-        req.user = user;
+        req.user = user; // attach user to request object
         next();
     } catch (error) {
         logger.error("Authentication error:", error);
-        next(error);
+        return res.status(401).json({ message: "Token is not valid or expired" });
     }
+};
+
+// ==========================
+// Admin middleware
+// Checks if user is admin
+// ==========================
+export const admin = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    if (req.user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied: Admins only" });
+    }
+
+    next();
 };
