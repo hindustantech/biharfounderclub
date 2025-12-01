@@ -1,5 +1,5 @@
 import Whiteboard from "../models/whiteboard.js";
-
+import Profile from "../models/Profile.js";
 
 export const createWhiteboard = async (req, res, next) => {
     try {
@@ -29,11 +29,38 @@ export const createWhiteboard = async (req, res, next) => {
 };
 
 const buildPaginationPipeline = (category, page, limit) => {
+    const skip = (page - 1) * limit;
+
     return {
         data: [
             { $match: { category } },
             { $sort: { createdAt: -1 } },
-            { $skip: (page - 1) * limit },
+            // Join with Profile
+            {
+                $lookup: {
+                    from: "profiles", // MongoDB collection name
+                    localField: "createdBy",
+                    foreignField: "userId",
+                    as: "creatorProfile",
+                }
+            },
+            { $unwind: { path: "$creatorProfile", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    title: 1,
+                    description: 1,
+                    category: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    creator: {
+                        image: "$creatorProfile.image",
+                        email: "$creatorProfile.email",
+                        linkedinUrl: "$creatorProfile.linkedinUrl",
+                        websiteUrl: "$creatorProfile.websiteUrl",
+                    }
+                }
+            },
+            { $skip: skip },
             { $limit: limit }
         ],
         count: [
@@ -42,7 +69,6 @@ const buildPaginationPipeline = (category, page, limit) => {
         ]
     };
 };
-
 
 export const getWhiteboardsPaged = async (req, res, next) => {
     try {
