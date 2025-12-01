@@ -40,7 +40,7 @@ app.use("/api/profileRoute", profileRoute);
 app.use("/api/whiteboardroute", whiteboardroute);
 app.use("/api/bannerroute", bannerroute);
 app.use("/api/usermangentroute", usermangentroute);
-app.use("/api/admin/profiles", adminprofile);
+app.use("/api/admin", adminprofile);
 
 app.get("/", (req, res) => {
     res.send("bihari founder club API is running");
