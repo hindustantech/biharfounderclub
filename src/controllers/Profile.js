@@ -1,6 +1,6 @@
 import Profile from "../models/Profile.js";
 import User from "../models/User.js";
-
+import { uploadToCloudinary } from "../config/imageUpload.js";
 export const getProfile = async (req, res, next) => {
     try {
         const profile = await Profile.findOne({ userId: req.user.id });
