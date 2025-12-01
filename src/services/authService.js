@@ -11,6 +11,9 @@ export const registerUser = async ({
     pan,
     password
 }) => {
+    if (!fullName || !whatsappNumber || !pan || !password) {
+        throw new Error("Missing required fields");
+    }
 
     // check if user exists using whatsapp or pan
     const existingUser = await User.findOne({
@@ -90,7 +93,7 @@ export const forgotPassword = async ({ whatsappNumber }) => {
     }
 
     // UID returned from WhatsApp API
-    const uid = resp?.data|| resp?.data?.data;
+    const uid = resp?.data || resp?.data?.data;
 
     if (!uid) {
         throw Object.assign(new Error("UID not returned by API"), { statusCode: 500 });
@@ -112,7 +115,7 @@ export const forgotPassword = async ({ whatsappNumber }) => {
 
 
 export const changePassword = async ({ whatsappNumber, uid, otp, newPassword }) => {
-    const user = await User.findOne({ whatsappNumber});
+    const user = await User.findOne({ whatsappNumber });
 
     if (!user) {
         throw Object.assign(new Error("Invalid UID"), { statusCode: 400 });
