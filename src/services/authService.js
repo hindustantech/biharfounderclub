@@ -90,7 +90,7 @@ export const forgotPassword = async ({ whatsappNumber }) => {
     }
 
     // UID returned from WhatsApp API
-    const uid = resp?.data?.uid || resp?.data?.data?.uid;
+    const uid = resp?.data|| resp?.data?.data;
 
     if (!uid) {
         throw Object.assign(new Error("UID not returned by API"), { statusCode: 500 });
