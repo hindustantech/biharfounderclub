@@ -112,7 +112,7 @@ export const forgotPassword = async ({ whatsappNumber }) => {
 
 
 export const changePassword = async ({ whatsappNumber, uid, otp, newPassword }) => {
-    const user = await User.findOne({ whatsappNumber, uid });
+    const user = await User.findOne({ whatsappNumber});
 
     if (!user) {
         throw Object.assign(new Error("Invalid UID"), { statusCode: 400 });
