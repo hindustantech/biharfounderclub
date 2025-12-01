@@ -127,7 +127,7 @@ export const changePassword = async ({ whatsappNumber, uid, otp, newPassword }) 
     const verify = await verifyWhatsAppOtp(uid, otp);
     logger.info("changePassword verify", verify);
 
-    if (!verify.success || verify?.data?.status !== "success") {
+    if (!verify.success) {
         throw Object.assign(new Error("Invalid OTP"), { statusCode: 400 });
     }
 
