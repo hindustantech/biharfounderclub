@@ -12,6 +12,7 @@ import { errorHandler } from "./middleware/errorMiddleware.js";
 import { logger } from "./config/logger.js";
 import profileRoute from "./routes/ProfileRoute.js";
 import whiteboardroute from "./routes/WhiteboardRoute.js";
+import bannerroute from './routes/Bannerroute.js'
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +36,7 @@ app.set('trust proxy', 1);
 app.use("/api/auth", authRoutes);
 app.use("/api/profileRoute", profileRoute);
 app.use("/api/whiteboardroute", whiteboardroute);
+app.use("/api/bannerroute", bannerroute);
 
 app.get("/", (req, res) => {
     res.send("bihari founder club API is running");
