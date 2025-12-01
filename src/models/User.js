@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema(
 
         uid: { type: String, default: null },
         otpExpires: { type: Date, default: null },
+        showMentroshipSection: {
+            type: Boolean,
+            default: false,
+        },
 
 
         isVerified: {
