@@ -14,6 +14,7 @@ class ProfileController {
                 membershipType,
                 profileVerified,
                 showInMentorSection,
+                status = "active", // NEW: active | inactive | all
                 page = 1,
                 limit = 10,
                 sortBy = "createdAt",
@@ -21,7 +22,15 @@ class ProfileController {
             } = req.query;
 
             // Build filter object
-            const filter = { isActive: true };
+            const filter = {};
+
+            // Status filter
+            if (status === "active") {
+                filter.isActive = true;
+            } else if (status === "inactive") {
+                filter.isActive = false;
+            }
+            // status=all → no filter applied
 
             // Search filter
             if (search) {
@@ -35,14 +44,10 @@ class ProfileController {
             }
 
             // Occupation filter
-            if (occupation) {
-                filter.occupation = occupation;
-            }
+            if (occupation) filter.occupation = occupation;
 
             // Membership type filter
-            if (membershipType) {
-                filter.membershipType = membershipType;
-            }
+            if (membershipType) filter.membershipType = membershipType;
 
             // Profile verified filter
             if (profileVerified !== undefined) {
@@ -54,10 +59,10 @@ class ProfileController {
                 filter.showInMentorSection = showInMentorSection === "true";
             }
 
-            // Calculate pagination
+            // Pagination
             const skip = (parseInt(page) - 1) * parseInt(limit);
 
-            // Sort configuration
+            // Sorting
             const sort = {};
             sort[sortBy] = sortOrder === "desc" ? -1 : 1;
 
@@ -65,23 +70,18 @@ class ProfileController {
             const profiles = await Profile.find(filter)
                 .populate({
                     path: "userId",
-                    select: "fullName role whatsappNumber pan isVerified",
-                    match: { isActive: true }
+                    select: "fullName role whatsappNumber pan isVerified isActive",
                 })
                 .sort(sort)
                 .skip(skip)
                 .limit(parseInt(limit))
                 .lean();
 
-            // Get total count for pagination
             const totalProfiles = await Profile.countDocuments(filter);
-
-            // Filter out profiles where user is not found
-            const validProfiles = profiles.filter(profile => profile.userId);
 
             res.status(200).json({
                 success: true,
-                data: validProfiles,
+                data: profiles,  // NO filter userId null → admin wants full
                 pagination: {
                     currentPage: parseInt(page),
                     totalPages: Math.ceil(totalProfiles / parseInt(limit)),
@@ -89,6 +89,7 @@ class ProfileController {
                     itemsPerPage: parseInt(limit)
                 }
             });
+
         } catch (error) {
             console.error("Error fetching profiles:", error);
             res.status(500).json({
@@ -98,6 +99,7 @@ class ProfileController {
             });
         }
     }
+
 
     // Get profile by ID
     async getProfileById(req, res) {
