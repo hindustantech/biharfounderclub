@@ -43,8 +43,8 @@ router.get('/admin/Whiteboards', protect, admin, async (req, res) => {
 
         const [Whiteboards, total] = await Promise.all([
             Whiteboard.find(query)
-                .populate('createdBy', 'name email')
-                .populate('lastModifiedBy', 'name email')
+                .populate('createdBy', 'fullName email')
+                .populate('lastModifiedBy', 'fulName email')
                 .sort(sort)
                 .skip(skip)
                 .limit(parseInt(limit))
@@ -111,7 +111,7 @@ router.patch('/admin/Whiteboards/:id/status', protect, admin, async (req, res) =
             });
         }
 
-        const Whiteboard = await Whiteboard.findByIdAndUpdate(
+        const whiteboard = await Whiteboard.findByIdAndUpdate(
             req.params.id,
             {
                 status,
@@ -121,7 +121,7 @@ router.patch('/admin/Whiteboards/:id/status', protect, admin, async (req, res) =
             { new: true, runValidators: true }
         ).populate('createdBy', 'name email');
 
-        if (!Whiteboard) {
+        if (!whiteboard) {
             return res.status(404).json({
                 success: false,
                 message: 'Whiteboard not found'
@@ -130,7 +130,7 @@ router.patch('/admin/Whiteboards/:id/status', protect, admin, async (req, res) =
 
         res.json({
             success: true,
-            data: Whiteboard,
+            data: whiteboard,
             message: `Whiteboard ${status} successfully`
         });
     } catch (error) {
@@ -158,13 +158,13 @@ router.patch('/admin/Whiteboards/:id/featured', protect, admin, async (req, res)
             updateData.featuredUntil = null;
         }
 
-        const Whiteboard = await Whiteboard.findByIdAndUpdate(
+        const whiteboard = await Whiteboard.findByIdAndUpdate(
             req.params.id,
             updateData,
             { new: true, runValidators: true }
         );
 
-        if (!Whiteboard) {
+        if (!whiteboard) {
             return res.status(404).json({
                 success: false,
                 message: 'Whiteboard not found'
@@ -173,7 +173,7 @@ router.patch('/admin/Whiteboards/:id/featured', protect, admin, async (req, res)
 
         res.json({
             success: true,
-            data: Whiteboard,
+            data: whiteboard,
             message: `Whiteboard ${isFeatured ? 'featured' : 'unfeatured'} successfully`
         });
     } catch (error) {
@@ -188,9 +188,9 @@ router.patch('/admin/Whiteboards/:id/featured', protect, admin, async (req, res)
 // Delete Whiteboard
 router.delete('/admin/Whiteboards/:id', protect, admin, async (req, res) => {
     try {
-        const Whiteboard = await Whiteboard.findByIdAndDelete(req.params.id);
+        const whiteboard = await Whiteboard.findByIdAndDelete(req.params.id);
 
-        if (!Whiteboard) {
+        if (!whiteboard) {
             return res.status(404).json({
                 success: false,
                 message: 'Whiteboard not found'
