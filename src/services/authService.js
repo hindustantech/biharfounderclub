@@ -71,7 +71,7 @@ export const loginUser = async ({ whatsappNumber, password }) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, user };
 };
 
 
