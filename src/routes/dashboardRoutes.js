@@ -4,8 +4,7 @@ import {
     getDashboardStats,
     getDashboardStatsSimple
 } from "../controllers/dashboardController.js";
-import { protect, admin } from "../middleware/authMiddleware.js";
-
+import { protect,admin } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // Get dashboard statistics (Admin only)
