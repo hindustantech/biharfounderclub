@@ -17,6 +17,7 @@ import usermangentroute from './routes/userRoutes.js'
 import adminprofile from './routes/profile.js'
 import whiteb from './routes/whiteboard.routes.js'
 import mentro from './routes/MentroRoute.js'
+import dashboard from './routes/dashboardRoutes.js'
 
 dotenv.config();
 const app = express();
@@ -46,6 +47,7 @@ app.use("/api/usermangentroute", usermangentroute);
 app.use("/api/admin", adminprofile);
 app.use("/api/whiteb", whiteb);
 app.use("/api/mentro", mentro);
+app.use("/api/dashboard", dashboard);
 
 app.get("/", (req, res) => {
     res.send("bihari founder club API is running");
