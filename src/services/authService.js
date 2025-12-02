@@ -57,22 +57,36 @@ export const registerUser = async ({
 
 
 export const loginUser = async ({ whatsappNumber, password }) => {
+    // Find user
     const user = await User.findOne({ whatsappNumber });
 
+    // Validate user + password
     if (!user || !(await user.comparePassword(password))) {
         throw Object.assign(new Error("Invalid WhatsApp number or password"), {
             statusCode: 401
         });
     }
 
+    // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
+    // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    return { accessToken, refreshToken, user };
+    // Return clean user data
+    return {
+        accessToken,
+        refreshToken,
+        user: {
+            fullName: user.fullName,
+            whatsappNumber: user.whatsappNumber,
+            role: user.role
+        }
+    };
 };
+
 
 
 
