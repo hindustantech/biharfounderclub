@@ -72,7 +72,7 @@ export const createBanner = async (req, res) => {
             });
         }
 
-        if (!req.file && !req.uploadId) {
+        if (!req.file) {
             return res.status(400).json({
                 success: false,
                 message: "Banner image is required",
@@ -80,26 +80,12 @@ export const createBanner = async (req, res) => {
             });
         }
 
-        let imageBuffer;
-
-        // Handle chunked upload
-        if (req.uploadId) {
-            try {
-                imageBuffer = await assembleChunks(req.uploadId, req.file.originalname);
-            } catch (chunkError) {
-                return res.status(500).json({
-                    success: false,
-                    message: "Failed to assemble image chunks",
-                    error: chunkError.message
-                });
-            }
-        } else {
-            imageBuffer = req.file.buffer;
-        }
+        // Use direct buffer (skip chunked upload logic)
+        const imageBuffer = req.file.buffer;
 
         // Validate image
         try {
-            const metadata = await validateImage(imageBuffer, {
+            await validateImage(imageBuffer, {
                 minWidth: 300,
                 minHeight: 150,
                 maxWidth: 4000,
@@ -130,7 +116,7 @@ export const createBanner = async (req, res) => {
         let uploadResult;
         try {
             const folder = `banners/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
-            const filename = generateUniqueFilename(req.file?.originalname || 'banner', processedBuffer);
+            const filename = generateUniqueFilename(req.file.originalname || 'banner', processedBuffer);
 
             uploadResult = await uploadToCloudinary(processedBuffer, folder, {
                 public_id: filename.replace(/\.[^/.]+$/, ""),
@@ -164,15 +150,6 @@ export const createBanner = async (req, res) => {
                             return false;
                         }
                     });
-            } else if (Array.isArray(link)) {
-                linkArray = link.filter(l => {
-                    try {
-                        const url = new URL(l);
-                        return ['http:', 'https:'].includes(url.protocol);
-                    } catch {
-                        return false;
-                    }
-                });
             }
         }
 
@@ -183,8 +160,6 @@ export const createBanner = async (req, res) => {
                 tagArray = tags.split(',')
                     .map(t => t.trim().toLowerCase())
                     .filter(t => t.length > 0);
-            } else if (Array.isArray(tags)) {
-                tagArray = tags.map(t => t.toString().toLowerCase().trim());
             }
         }
 
@@ -215,12 +190,7 @@ export const createBanner = async (req, res) => {
         res.status(201).json({
             success: true,
             message: "Banner created successfully",
-            data: savedBanner,
-            imageInfo: {
-                size: uploadResult.bytes,
-                dimensions: `${uploadResult.width}x${uploadResult.height}`,
-                format: uploadResult.format
-            }
+            data: savedBanner
         });
 
     } catch (error) {
