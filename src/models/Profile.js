@@ -22,7 +22,7 @@ const UserProfile = new mongoose.Schema(
     phoneCountryCode: { type: String, default: "+91" },
     phoneNumber: { type: String, required: true },
     whatsappNumber: { type: String },
-    email: { type: String, required: true },
+    email: { type: String, },
 
     // Govt ID
     pan: { type: String },

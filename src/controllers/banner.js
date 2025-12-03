@@ -1,13 +1,67 @@
 import Banner from "../models/banner.js";
-import { uploadToCloudinary } from "../config/imageUpload.js";
+import {
+    uploadToCloudinary,
+    deleteFromCloudinary,
+    processImage,
+    validateImage,
+    generateUniqueFilename
+} from "../config/imageUpload.js";
+
+import { assembleChunks } from '../middleware/chunkedUpload.js';
 
 
+// In bannerController.js
+const uploadProgress = new Map(); // Store upload progress
+
+export const getUploadProgress = async (req, res) => {
+    const { uploadId } = req.params;
+
+    if (!uploadProgress.has(uploadId)) {
+        return res.status(404).json({
+            success: false,
+            message: "Upload session not found"
+        });
+    }
+
+    const progress = uploadProgress.get(uploadId);
+
+    res.json({
+        success: true,
+        progress: progress.percentage,
+        uploadedChunks: progress.uploadedChunks,
+        totalChunks: progress.totalChunks,
+        status: progress.status
+    });
+};
+
+// Update progress during chunk upload
+const updateProgress = (uploadId, chunkIndex, totalChunks) => {
+    if (!uploadProgress.has(uploadId)) {
+        uploadProgress.set(uploadId, {
+            uploadedChunks: 0,
+            totalChunks,
+            percentage: 0,
+            status: 'uploading'
+        });
+    }
+
+    const progress = uploadProgress.get(uploadId);
+    progress.uploadedChunks = chunkIndex + 1;
+    progress.percentage = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+
+    // Clean up old progress after 1 hour
+    setTimeout(() => {
+        uploadProgress.delete(uploadId);
+    }, 60 * 60 * 1000);
+};
 /**
  * CREATE NEW BANNER
  */
 export const createBanner = async (req, res) => {
+    let cloudinaryPublicId = null;
+
     try {
-        const { title, link, email, phoneNumber, description, isActive = true } = req.body;
+        const { title, link, email, phoneNumber, description, tags, priority = 0, isActive = true } = req.body;
 
         // Validation
         if (!title || !title.trim()) {
@@ -18,7 +72,7 @@ export const createBanner = async (req, res) => {
             });
         }
 
-        if (!req.file) {
+        if (!req.file && !req.uploadId) {
             return res.status(400).json({
                 success: false,
                 message: "Banner image is required",
@@ -26,30 +80,67 @@ export const createBanner = async (req, res) => {
             });
         }
 
-        // Validate file type
-        const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-        if (!validTypes.includes(req.file.mimetype)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid file type",
-                errors: { image: "Only JPEG, PNG, WEBP, and GIF images are allowed" }
-            });
+        let imageBuffer;
+
+        // Handle chunked upload
+        if (req.uploadId) {
+            try {
+                imageBuffer = await assembleChunks(req.uploadId, req.file.originalname);
+            } catch (chunkError) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to assemble image chunks",
+                    error: chunkError.message
+                });
+            }
+        } else {
+            imageBuffer = req.file.buffer;
         }
 
-        // Validate file size (5MB max)
-        const maxSize = 5 * 1024 * 1024;
-        if (req.file.size > maxSize) {
-            return res.status(400).json({
-                success: false,
-                message: "File too large",
-                errors: { image: "Image must be less than 5MB" }
-            });
-        }
-
-        // Upload image
-        let imageUrl;
+        // Validate image
         try {
-            imageUrl = await uploadToCloudinary(req.file.buffer, "banners");
+            const metadata = await validateImage(imageBuffer, {
+                minWidth: 300,
+                minHeight: 150,
+                maxWidth: 4000,
+                maxHeight: 2000,
+                maxFileSize: 50 * 1024 * 1024 // 50MB
+            });
+        } catch (validationError) {
+            return res.status(400).json({
+                success: false,
+                message: "Image validation failed",
+                errors: { image: validationError.message }
+            });
+        }
+
+        // Process and optimize image
+        let processedBuffer;
+        try {
+            processedBuffer = await processImage(imageBuffer);
+        } catch (processError) {
+            return res.status(500).json({
+                success: false,
+                message: "Failed to process image",
+                error: processError.message
+            });
+        }
+
+        // Upload to Cloudinary
+        let uploadResult;
+        try {
+            const folder = `banners/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
+            const filename = generateUniqueFilename(req.file?.originalname || 'banner', processedBuffer);
+
+            uploadResult = await uploadToCloudinary(processedBuffer, folder, {
+                public_id: filename.replace(/\.[^/.]+$/, ""),
+                transformation: [
+                    { quality: 'auto:best' },
+                    { fetch_format: 'auto' }
+                ]
+            });
+
+            cloudinaryPublicId = uploadResult.publicId;
         } catch (uploadError) {
             console.error("Cloudinary upload error:", uploadError);
             return res.status(500).json({
@@ -61,32 +152,39 @@ export const createBanner = async (req, res) => {
 
         // Process links
         let linkArray = [];
-        if (link && typeof link === "string") {
-            linkArray = link
-                .split(",")
-                .map(l => l.trim())
-                .filter(l => {
-                    // Basic URL validation
+        if (link) {
+            if (typeof link === 'string') {
+                linkArray = link.split(',')
+                    .map(l => l.trim())
+                    .filter(l => {
+                        try {
+                            const url = new URL(l);
+                            return ['http:', 'https:'].includes(url.protocol);
+                        } catch {
+                            return false;
+                        }
+                    });
+            } else if (Array.isArray(link)) {
+                linkArray = link.filter(l => {
                     try {
-                        new URL(l);
-                        return true;
+                        const url = new URL(l);
+                        return ['http:', 'https:'].includes(url.protocol);
                     } catch {
                         return false;
                     }
                 });
+            }
         }
 
-        // Validate email if provided
-        if (email && email.trim()) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                // Clean up uploaded image if email is invalid
-                // await deleteFromCloudinary(imageUrl);
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid email format",
-                    errors: { email: "Please enter a valid email address" }
-                });
+        // Process tags
+        let tagArray = [];
+        if (tags) {
+            if (typeof tags === 'string') {
+                tagArray = tags.split(',')
+                    .map(t => t.trim().toLowerCase())
+                    .filter(t => t.length > 0);
+            } else if (Array.isArray(tags)) {
+                tagArray = tags.map(t => t.toString().toLowerCase().trim());
             }
         }
 
@@ -94,11 +192,22 @@ export const createBanner = async (req, res) => {
         const newBanner = new Banner({
             title: title.trim(),
             description: description?.trim() || "",
-            imageUrl,
+            imageUrl: uploadResult.url,
+            imagePublicId: uploadResult.publicId,
+            imageMetadata: {
+                format: uploadResult.format,
+                width: uploadResult.width,
+                height: uploadResult.height,
+                size: uploadResult.bytes
+            },
             link: linkArray,
-            email: email?.trim() || "",
+            email: email?.trim()?.toLowerCase() || "",
             phoneNumber: phoneNumber?.trim() || "",
-            isActive: isActive === "true" || isActive === true
+            tags: tagArray,
+            priority: parseInt(priority) || 0,
+            isActive: isActive === "true" || isActive === true,
+            views: 0,
+            clicks: 0
         });
 
         const savedBanner = await newBanner.save();
@@ -106,15 +215,29 @@ export const createBanner = async (req, res) => {
         res.status(201).json({
             success: true,
             message: "Banner created successfully",
-            data: savedBanner
+            data: savedBanner,
+            imageInfo: {
+                size: uploadResult.bytes,
+                dimensions: `${uploadResult.width}x${uploadResult.height}`,
+                format: uploadResult.format
+            }
         });
 
     } catch (error) {
         console.error("Error creating banner:", error);
 
+        // Clean up uploaded image if error occurred
+        if (cloudinaryPublicId) {
+            try {
+                await deleteFromCloudinary(cloudinaryPublicId);
+            } catch (cleanupError) {
+                console.error("Failed to cleanup uploaded image:", cleanupError);
+            }
+        }
+
         // Handle duplicate key errors
         if (error.code === 11000) {
-            return res.status(400).json({
+            return res.status(409).json({
                 success: false,
                 message: "A banner with this title already exists",
                 error: "Duplicate title"
@@ -139,6 +262,43 @@ export const createBanner = async (req, res) => {
             success: false,
             message: "Internal server error",
             error: process.env.NODE_ENV === "development" ? error.message : undefined
+        });
+    }
+};
+
+// Additional controller for chunked upload initiation
+export const initiateChunkedUpload = async (req, res) => {
+    try {
+        const { fileName, fileSize, mimeType } = req.body;
+
+        if (fileSize > 50 * 1024 * 1024) {
+            return res.status(400).json({
+                success: false,
+                message: "File size exceeds 50MB limit"
+            });
+        }
+
+        const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+        if (!validTypes.includes(mimeType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid file type"
+            });
+        }
+
+        const uploadId = crypto.randomBytes(16).toString('hex');
+
+        res.status(200).json({
+            success: true,
+            uploadId,
+            chunkSize: 5 * 1024 * 1024, // 5MB chunks
+            maxChunks: Math.ceil(fileSize / (5 * 1024 * 1024))
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to initiate upload",
+            error: error.message
         });
     }
 };
@@ -240,7 +400,7 @@ export const getBannerById = async (req, res) => {
  */
 export const updateBanner = async (req, res) => {
     try {
-        
+
         const { id } = req.params;
         const { title, link, email, phoneNumber, description, isActive } = req.body;
 
