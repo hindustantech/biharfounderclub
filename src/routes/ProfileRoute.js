@@ -1,20 +1,38 @@
+
+
+
+
+
+
+
+
+
+
+
+// routes/profileRoutes.js
 import express from "express";
-import { protect } from "../middleware/authMiddleware.js";
-import {
-    getProfile,
-    createOrUpdateProfile,
+import { 
+    getProfile, 
+    getUserDetails, 
+    createOrUpdateProfile, 
     deleteProfile,
-    getuserdeatels
+    deleteProfileImage,
+    updateProfileImage 
 } from "../controllers/Profile.js";
-
-
 import multer from "multer";
 
+import { protect } from "../middleware/authMiddleware.js";
+
+
+import { upload } from "../middleware/uploadMiddleware.js";
+import { validateProfile } from "../middleware/validation.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
-
-
+// Apply authentication middleware to all routes
+router.use(protect);
+    
 const storage = multer.memoryStorage(); // buffer create
 
 export const upload = multer({
@@ -22,9 +40,12 @@ export const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
 });
 
-router.get("/me", protect, getProfile);
-router.get("/getuserdeatels", protect, getuserdeatels);
-router.post("/", protect,  upload.single("image"), createOrUpdateProfile);
-router.delete("/", protect, deleteProfile);
+// Routes
+router.get("/", getProfile);
+router.get("/user-details", getUserDetails);
+router.post("/", upload.single("image"), validateProfile, createOrUpdateProfile);
+router.delete("/", deleteProfile);
+router.delete("/image", deleteProfileImage);
+router.patch("/image", upload.single("image"), updateProfileImage);
 
 export default router;

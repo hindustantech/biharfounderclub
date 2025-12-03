@@ -13,7 +13,21 @@ const UserProfile = new mongoose.Schema(
     name: { type: String, required: true },
     image: { type: String, default: null },
     dob: { type: Date, required: false },
-
+    image: {
+      type: String,
+      default: null
+    },
+    imagePublicId: {
+      type: String,
+      default: null
+    },
+    imageMetadata: {
+      format: String,
+      width: Number,
+      height: Number,
+      size: Number,
+      uploadedAt: Date
+    },
     // Address
     nativeAddress: { type: String },
     currentAddress: { type: String },
@@ -119,6 +133,10 @@ const UserProfile = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   },
   { timestamps: true }
 );
