@@ -34,30 +34,41 @@ app.use(
         crossOriginResourcePolicy: false, // Helmet will not interfere with CORS
     })
 );
-
 const allowedOrigins = [
     "https://biharifoundersclub.com",
+    "https://www.biharifoundersclub.com",
     "https://admin.biharifoundersclub.com",
-    "http://localhost:8080",
+
+    // Local Development (Desktop apps included)
+    "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:5173",
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+
+    // Desktop electron / standalone apps
+    "capacitor://localhost",
+    "tauri://localhost",
+    "file://"
 ];
 
 app.use(
     cors({
-        origin: (origin, callback) => {
+        origin: function (origin, callback) {
+            // Allow requests with no origin (Desktop apps, mobile apps, curl)
             if (!origin) {
-                return callback(null, true); // mobile apps / curl / postman
+                return callback(null, true);
             }
 
             if (allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
 
-            // 👇 Debug kare — but block nahi kare
-            console.log("❌ Blocked Origin:", origin);
-            return callback(null, true);
+            console.log("❌ CORS BLOCKED:", origin);
+            return callback(null, false); // Do not throw hard error
         },
+
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
@@ -69,6 +80,7 @@ app.use(
         ]
     })
 );
+
 
 
 
