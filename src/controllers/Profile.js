@@ -112,9 +112,9 @@ const validateProfileFields = (data) => {
         if (!data.areaOfExpertise || !data.areaOfExpertise.trim()) {
             errors.push("areaOfExpertise is required for Mentor.");
         }
-        if (typeof data.availableForMentorship !== "boolean") {
-            errors.push("availableForMentorship must be true or false.");
-        }
+        // if (typeof data.availableForMentorship !== "boolean") {
+        //     errors.push("availableForMentorship must be true or false.");
+        // }
     }
 
     return errors;
