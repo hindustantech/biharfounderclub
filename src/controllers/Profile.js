@@ -1,11 +1,11 @@
 import Profile from "../models/Profile.js";
 import User from "../models/User.js";
-import { 
-    uploadToCloudinary, 
+import {
+    uploadToCloudinary,
     deleteFromCloudinary,
     processImage,
     validateImage,
-    generateUniqueFilename 
+    generateUniqueFilename
 } from "../config/imageUpload.js";
 import { validationResult } from "express-validator";
 
@@ -50,7 +50,7 @@ const validateProfileFields = (data) => {
     if (data.linkedinUrl && !isValidUrl(data.linkedinUrl)) {
         errors.push("Invalid LinkedIn URL");
     }
-    
+
     if (data.websiteUrl && !isValidUrl(data.websiteUrl)) {
         errors.push("Invalid website URL");
     }
@@ -60,14 +60,14 @@ const validateProfileFields = (data) => {
         const dob = new Date(data.dob);
         const today = new Date();
         const minDate = new Date('1900-01-01');
-        
+
         if (dob > today) {
             errors.push("Date of birth cannot be in the future");
         }
         if (dob < minDate) {
             errors.push("Date of birth cannot be before 1900");
         }
-        
+
         // Calculate age
         const age = today.getFullYear() - dob.getFullYear();
         if (age < 18) {
@@ -233,9 +233,16 @@ export const getUserDetails = async (req, res) => {
  * @route POST /api/profile
  * @access Private
  */
+// In your createOrUpdateProfile function, update the image handling section:
+
+/**
+ * @desc Create OR Update Profile (Auto Create if not found)
+ * @route POST /api/profile
+ * @access Private
+ */
 export const createOrUpdateProfile = async (req, res) => {
     let cloudinaryPublicId = null;
-    
+
     try {
         // Express-validator results
         const errors = validationResult(req);
@@ -287,9 +294,9 @@ export const createOrUpdateProfile = async (req, res) => {
             occupationDescription,
             supportStageMessage,
             membershipType,
-            mentorshipFields: mentorshipFields ? 
-                (typeof mentorshipFields === 'string' ? 
-                    mentorshipFields.split(',').map(f => f.trim()) : 
+            mentorshipFields: mentorshipFields ?
+                (typeof mentorshipFields === 'string' ?
+                    mentorshipFields.split(',').map(f => f.trim()) :
                     mentorshipFields
                 ) : [],
             previousExperience,
@@ -344,8 +351,9 @@ export const createOrUpdateProfile = async (req, res) => {
                     ]
                 });
 
-                imageUrl = uploadResult.url;
-                imagePublicId = uploadResult.publicId;
+                // CRITICAL FIX: Extract just the URL string, not the entire object
+                imageUrl = uploadResult.url; // This should be just the URL string
+                imagePublicId = uploadResult.publicId; // This is separate field
                 imageMetadata = {
                     format: uploadResult.format,
                     width: uploadResult.width,
@@ -366,13 +374,14 @@ export const createOrUpdateProfile = async (req, res) => {
             }
         }
 
-        // Prepare profile data
+        // Prepare profile data - MAKE SURE IMAGE IS JUST A STRING
         const profileData = {
             userId: req.user.id,
             name: name?.trim(),
-            image: imageUrl,
-            imagePublicId: imagePublicId,
-            imageMetadata: imageMetadata,
+            // CRITICAL: Save only the URL string in the 'image' field
+            image: imageUrl, // This must be a string, not an object
+            imagePublicId: imagePublicId, // Store Cloudinary public ID separately
+            imageMetadata: imageMetadata, // Store metadata separately
             dob: dob ? new Date(dob) : undefined,
             nativeAddress: nativeAddress?.trim(),
             currentAddress: currentAddress?.trim(),
@@ -387,9 +396,9 @@ export const createOrUpdateProfile = async (req, res) => {
             occupationDescription: occupationDescription?.trim(),
             supportStageMessage: supportStageMessage?.trim(),
             membershipType: membershipType?.trim(),
-            mentorshipFields: mentorshipFields ? 
-                (typeof mentorshipFields === 'string' ? 
-                    mentorshipFields.split(',').map(f => f.trim().toLowerCase()) : 
+            mentorshipFields: mentorshipFields ?
+                (typeof mentorshipFields === 'string' ?
+                    mentorshipFields.split(',').map(f => f.trim().toLowerCase()) :
                     mentorshipFields.map(f => f.trim().toLowerCase())
                 ) : [],
             previousExperience: previousExperience?.trim(),
@@ -397,6 +406,13 @@ export const createOrUpdateProfile = async (req, res) => {
             availableForMentorship: availableForMentorship === true || availableForMentorship === 'true',
             lastUpdated: new Date()
         };
+
+        // Debug log to check data structure
+        console.log("Profile data to save:", {
+            image: typeof profileData.image,
+            imagePublicId: typeof profileData.imagePublicId,
+            imageMetadata: typeof profileData.imageMetadata
+        });
 
         // Remove undefined values for clean update
         Object.keys(profileData).forEach(
@@ -406,8 +422,8 @@ export const createOrUpdateProfile = async (req, res) => {
         // Check existing profile
         let existingProfile = await Profile.findOne({ userId: req.user.id });
 
+        // Delete old image from Cloudinary if new image is uploaded
         if (existingProfile && existingProfile.imagePublicId && imagePublicId) {
-            // Delete old image from Cloudinary if new image is uploaded
             try {
                 await deleteFromCloudinary(existingProfile.imagePublicId);
             } catch (deleteError) {
@@ -426,13 +442,9 @@ export const createOrUpdateProfile = async (req, res) => {
                 message: "Profile created successfully",
                 data: {
                     ...newProfile.toObject(),
-                    imageMetadata: imageMetadata
-                },
-                imageInfo: imageMetadata ? {
-                    size: imageMetadata.size,
-                    dimensions: `${imageMetadata.width}x${imageMetadata.height}`,
-                    format: imageMetadata.format
-                } : null
+                    // Make sure we're returning string URL to frontend
+                    image: newProfile.image // Should be string URL
+                }
             });
         }
 
@@ -440,22 +452,30 @@ export const createOrUpdateProfile = async (req, res) => {
         const updatedProfile = await Profile.findOneAndUpdate(
             { userId: req.user.id },
             { $set: profileData },
-            { 
-                new: true, 
+            {
+                new: true,
                 runValidators: true,
-                context: 'query' 
+                context: 'query'
             }
         ).select("-__v");
+
+        // Verify the image field is a string
+        if (updatedProfile && typeof updatedProfile.image !== 'string' && updatedProfile.image !== null) {
+            console.error("❌ Image field is not a string:", updatedProfile.image);
+            // Convert to string if it's an object
+            if (typeof updatedProfile.image === 'object' && updatedProfile.image.url) {
+                await Profile.updateOne(
+                    { _id: updatedProfile._id },
+                    { $set: { image: updatedProfile.image.url } }
+                );
+                updatedProfile.image = updatedProfile.image.url;
+            }
+        }
 
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
-            data: updatedProfile,
-            imageInfo: imageMetadata ? {
-                size: imageMetadata.size,
-                dimensions: `${imageMetadata.width}x${imageMetadata.height}`,
-                format: imageMetadata.format
-            } : null
+            data: updatedProfile
         });
 
     } catch (error) {
@@ -468,6 +488,15 @@ export const createOrUpdateProfile = async (req, res) => {
             } catch (cleanupError) {
                 console.error("❌ Failed to cleanup uploaded image:", cleanupError);
             }
+        }
+
+        // Handle CastError specifically for image field
+        if (error.name === "CastError" && error.path === "image") {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid image data format",
+                error: "Image must be a URL string"
+            });
         }
 
         // Handle duplicate key errors
@@ -536,7 +565,7 @@ export const deleteProfileImage = async (req, res) => {
 
         // Delete from Cloudinary
         const deleted = await deleteFromCloudinary(profile.imagePublicId);
-        
+
         if (!deleted) {
             return res.status(500).json({
                 success: false,
