@@ -28,23 +28,30 @@ const PORT = process.env.PORT || 3000;
 
 
 
-
-// Security middleware
+// -------------------------
 app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Upload-Id",
-      "Content-Range",
-      "X-Requested-With"
-    ]
-  })
+    helmet({
+        crossOriginResourcePolicy: false, // Helmet will not interfere with CORS
+    })
 );
 
-
+// -------------------------
+// CORS - allow all origins dynamically
+// -------------------------
+app.use(
+    cors({
+        origin: true, // Reflect request origin
+        credentials: true, // Allow cookies/auth headers
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "Upload-Id",
+            "Content-Range",
+            "X-Requested-With"
+        ]
+    })
+);
 
 
 
