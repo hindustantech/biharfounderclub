@@ -14,7 +14,7 @@ import multer from "multer";
 import { protect } from "../middleware/authMiddleware.js";
 
 
-import { validateProfile } from "../middleware/validation.js";
+
 
 const router = express.Router();
 
@@ -31,7 +31,7 @@ export const upload = multer({
 // Routes
 router.get("/", getProfile);
 router.get("/user-details", getUserDetails);
-router.post("/", upload.single("image"), validateProfile, createOrUpdateProfile);
+router.post("/", upload.single("image"), createOrUpdateProfile);
 router.delete("/", deleteProfile);
 router.delete("/image", deleteProfileImage);
 router.patch("/image", upload.single("image"), updateProfileImage);
