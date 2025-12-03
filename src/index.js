@@ -29,12 +29,12 @@ const PORT = process.env.PORT || 3000;
 
 
 const allowedOrigins = [
+    'https://biharifoundersclub.com',
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:8080',
     'http://localhost:5173',
     'https://admin.biharifoundersclub.com',
-    'https://biharifoundersclub.com'
     // Add more as needed
 ];
 
@@ -65,9 +65,12 @@ const corsOptions = {
 };
 
 // Security middleware
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+app.use(
+    helmet({
+        crossOriginResourcePolicy: false, // IMPORTANT FIX
+    })
+);
+
 
 // Apply CORS middleware - ONLY ONCE
 app.use(cors(corsOptions));
