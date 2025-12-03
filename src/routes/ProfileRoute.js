@@ -29,7 +29,7 @@ export const upload = multer({
 });
 
 // Routes
-router.get("/", getProfile);
+router.get("/me", getProfile);
 router.get("/user-details", getUserDetails);
 router.post("/", upload.single("image"), createOrUpdateProfile);
 router.delete("/", deleteProfile);
