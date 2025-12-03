@@ -35,13 +35,30 @@ app.use(
     })
 );
 
-// -------------------------
-// CORS - allow all origins dynamically
-// -------------------------
+const allowedOrigins = [
+    "https://biharifoundersclub.com",
+    "https://admin.biharifoundersclub.com",
+    "http://localhost:8080",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+];
+
 app.use(
     cors({
-        origin: true, // Reflect request origin
-        credentials: true, // Allow cookies/auth headers
+        origin: (origin, callback) => {
+            if (!origin) {
+                return callback(null, true); // mobile apps / curl / postman
+            }
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            // 👇 Debug kare — but block nahi kare
+            console.log("❌ Blocked Origin:", origin);
+            return callback(null, true);
+        },
+        credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: [
             "Content-Type",
