@@ -28,52 +28,24 @@ const PORT = process.env.PORT || 3000;
 
 
 
-const allowedOrigins = [
-    'https://biharifoundersclub.com',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8080',
-    'http://localhost:5173',
-    'https://admin.biharifoundersclub.com',
-    // Add more as needed
-];
-
-// CORS Configuration
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-
-        if (allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`CORS blocked: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'Upload-Id',
-        'Content-Range',
-        'X-Requested-With'
-    ],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-};
 
 // Security middleware
 app.use(
-    helmet({
-        crossOriginResourcePolicy: false, // IMPORTANT FIX
-    })
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Upload-Id",
+      "Content-Range",
+      "X-Requested-With"
+    ]
+  })
 );
 
 
-// Apply CORS middleware - ONLY ONCE
-app.use(cors(corsOptions));
+
 
 
 // Increase payload size for large image uploads
