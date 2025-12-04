@@ -135,31 +135,109 @@ const isValidUrl = (url) => {
 /**
  * Validate image file
  */
+/**
+ * Validate image file - NEVER FAILS, always returns result
+ */
 const validateProfileImage = async (buffer) => {
     try {
-        // Validate image dimensions and size
-        const metadata = await validateImage(buffer, {
+        if (!buffer || buffer.length === 0) {
+            return {
+                isValid: false,
+                message: "No image data provided",
+                metadata: null
+            };
+        }
+
+        // Try to get metadata first
+        let metadata;
+        try {
+            metadata = await sharp(buffer).metadata();
+        } catch (metadataError) {
+            return {
+                isValid: false,
+                message: "Invalid image file format",
+                metadata: null
+            };
+        }
+
+        const validationOptions = {
             minWidth: 100,
             minHeight: 100,
-            maxWidth: null,   // No limit
-            maxHeight: null,  // No limit
-
-            maxFileSize: 10 * 1024 * 1024, // 10MB for profile images
+            maxWidth: null, // Changed from 5000 to null (no limit)
+            maxHeight: null, // Changed from 5000 to null (no limit)
+            maxFileSize: 10 * 1024 * 1024, // 10MB
             aspectRatio: null
-        });
+        };
 
+        // Check file size
+        if (buffer.length > validationOptions.maxFileSize) {
+            return {
+                isValid: false,
+                message: `File size exceeds ${validationOptions.maxFileSize / (1024 * 1024)}MB limit`,
+                metadata
+            };
+        }
+
+        // Check minimum dimensions
+        if (metadata.width < validationOptions.minWidth || metadata.height < validationOptions.minHeight) {
+            return {
+                isValid: false,
+                message: `Image too small. Minimum dimensions: ${validationOptions.minWidth}x${validationOptions.minHeight}px`,
+                metadata
+            };
+        }
+
+        // Check maximum dimensions if specified
+        if (validationOptions.maxWidth && metadata.width > validationOptions.maxWidth) {
+            return {
+                isValid: false,
+                message: `Image width exceeds maximum of ${validationOptions.maxWidth}px`,
+                metadata
+            };
+        }
+
+        if (validationOptions.maxHeight && metadata.height > validationOptions.maxHeight) {
+            return {
+                isValid: false,
+                message: `Image height exceeds maximum of ${validationOptions.maxHeight}px`,
+                metadata
+            };
+        }
+
+        // Check aspect ratio if specified
+        if (validationOptions.aspectRatio) {
+            const [ratioW, ratioH] = validationOptions.aspectRatio.split(':').map(Number);
+            const currentRatio = metadata.width / metadata.height;
+            const expectedRatio = ratioW / ratioH;
+            const tolerance = 0.1;
+
+            if (Math.abs(currentRatio - expectedRatio) > tolerance) {
+                return {
+                    isValid: false,
+                    message: `Image aspect ratio must be ${ratioW}:${ratioH}`,
+                    metadata
+                };
+            }
+        }
+
+        // If all checks pass
         return {
             isValid: true,
             metadata,
             message: "Image validation successful"
         };
+
     } catch (error) {
+        console.log("IMAGE VALIDATION ERROR:", error);
+
         return {
             isValid: false,
-            message: error.message
+            message: error.message || "Unknown image validation error",
+            metadata: null
         };
     }
 };
+
 
 /**
  * @desc Get user profile
@@ -231,6 +309,11 @@ export const getUserDetails = async (req, res) => {
 
 
 
+/**
+ * @desc Create OR Update Profile (Auto Create if not found)
+ * @route POST /api/profile
+ * @access Private
+ */
 /**
  * @desc Create OR Update Profile (Auto Create if not found)
  * @route POST /api/profile
@@ -318,55 +401,75 @@ export const createOrUpdateProfile = async (req, res) => {
         // IMAGE UPLOAD / DELETE LOGIC
         // -----------------------------
         if (req.file) {
-            // VALIDATE IMAGE
+            // VALIDATE IMAGE - This will NEVER throw an error
             const imageValidation = await validateProfileImage(req.file.buffer);
+
             if (!imageValidation.isValid) {
+                // Return the validation error but don't crash
+                console.log("Image validation warning:", imageValidation.message);
+
+                // Option 1: Return error immediately
                 return res.status(400).json({
                     success: false,
                     message: "Image validation failed",
                     errors: { image: imageValidation.message }
                 });
-            }
 
-            // PROCESS IMAGE (compress + resize)
-            const processedBuffer = await processImage(req.file.buffer);
-
-            const filename = generateUniqueFilename(
-                req.file.originalname || "profile",
-                processedBuffer
-            );
-
-            const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
-
-            // UPLOAD TO CLOUDINARY
-            const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
-                public_id: filename.replace(/\.[^/.]+$/, ""),
-                transformation: [
-                    { width: 500, height: 500, crop: "fill" },
-                    { quality: "auto:best" },
-                    { fetch_format: "auto" }
-                ]
-            });
-
-            imageUrl = uploadResult.url;
-            imagePublicId = uploadResult.publicId;
-
-            imageMetadata = {
-                format: uploadResult.format,
-                width: uploadResult.width,
-                height: uploadResult.height,
-                size: uploadResult.bytes,
-                uploadedAt: new Date().toISOString()
-            };
-
-            cloudinaryPublicId = uploadResult.publicId;
-
-            // DELETE OLD IMAGE
-            if (existingProfile?.imagePublicId) {
+                // Option 2: Continue without image (if you want to accept profile without image)
+                // console.log("Skipping image upload due to validation warning:", imageValidation.message);
+                // imageUrl = undefined;
+                // imagePublicId = undefined;
+                // imageMetadata = undefined;
+            } else {
+                // Only process and upload if validation passed
                 try {
-                    await deleteFromCloudinary(existingProfile.imagePublicId);
-                } catch (e) {
-                    console.log("Old image delete failed", e);
+                    // PROCESS IMAGE (compress + resize)
+                    const processedBuffer = await processImage(req.file.buffer);
+
+                    const filename = generateUniqueFilename(
+                        req.file.originalname || "profile",
+                        processedBuffer
+                    );
+
+                    const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
+
+                    // UPLOAD TO CLOUDINARY
+                    const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
+                        public_id: filename.replace(/\.[^/.]+$/, ""),
+                        transformation: [
+                            { width: 500, height: 500, crop: "fill" },
+                            { quality: "auto:best" },
+                            { fetch_format: "auto" }
+                        ]
+                    });
+
+                    imageUrl = uploadResult.url;
+                    imagePublicId = uploadResult.publicId;
+
+                    imageMetadata = {
+                        format: uploadResult.format,
+                        width: uploadResult.width,
+                        height: uploadResult.height,
+                        size: uploadResult.bytes,
+                        uploadedAt: new Date().toISOString()
+                    };
+
+                    cloudinaryPublicId = uploadResult.publicId;
+
+                    // DELETE OLD IMAGE
+                    if (existingProfile?.imagePublicId) {
+                        try {
+                            await deleteFromCloudinary(existingProfile.imagePublicId);
+                        } catch (e) {
+                            console.log("Old image delete failed", e);
+                        }
+                    }
+                } catch (uploadError) {
+                    console.error("Image upload failed:", uploadError);
+                    // Don't crash the whole request - just don't set image
+                    imageUrl = undefined;
+                    imagePublicId = undefined;
+                    imageMetadata = undefined;
                 }
             }
         }
@@ -469,7 +572,7 @@ export const createOrUpdateProfile = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Internal server error",
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };

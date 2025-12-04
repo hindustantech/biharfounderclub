@@ -119,6 +119,9 @@ export const generateUniqueFilename = (originalname, buffer) => {
 /**
  * Validate image dimensions and aspect ratio
  */
+/**
+ * Validate image dimensions and aspect ratio - Returns result instead of throwing
+ */
 export const validateImage = async (buffer, options = {}) => {
     const {
         minWidth = 100,
@@ -126,22 +129,34 @@ export const validateImage = async (buffer, options = {}) => {
         maxWidth = 5000,
         maxHeight = 5000,
         aspectRatio = null,
-        maxFileSize = 50 * 1024 * 1024 // 50MB default
+        maxFileSize = 50 * 1024 * 1024
     } = options;
 
-    if (buffer.length > maxFileSize) {
-        throw new Error(`File size exceeds ${maxFileSize / (1024 * 1024)}MB limit`);
-    }
-
     try {
+        if (buffer.length > maxFileSize) {
+            return {
+                isValid: false,
+                error: `File size exceeds ${maxFileSize / (1024 * 1024)}MB limit`,
+                metadata: null
+            };
+        }
+
         const metadata = await sharp(buffer).metadata();
 
         if (metadata.width < minWidth || metadata.height < minHeight) {
-            throw new Error(`Image too small. Minimum dimensions: ${minWidth}x${minHeight}px`);
+            return {
+                isValid: false,
+                error: `Image too small. Minimum dimensions: ${minWidth}x${minHeight}px`,
+                metadata
+            };
         }
 
         if (metadata.width > maxWidth || metadata.height > maxHeight) {
-            throw new Error(`Image too large. Maximum dimensions: ${maxWidth}x${maxHeight}px`);
+            return {
+                isValid: false,
+                error: `Image too large. Maximum dimensions: ${maxWidth}x${maxHeight}px`,
+                metadata
+            };
         }
 
         if (aspectRatio) {
@@ -151,12 +166,24 @@ export const validateImage = async (buffer, options = {}) => {
             const tolerance = 0.1;
 
             if (Math.abs(currentRatio - expectedRatio) > tolerance) {
-                throw new Error(`Image aspect ratio must be ${ratioW}:${ratioH}`);
+                return {
+                    isValid: false,
+                    error: `Image aspect ratio must be ${ratioW}:${ratioH}`,
+                    metadata
+                };
             }
         }
 
-        return metadata;
+        return {
+            isValid: true,
+            metadata,
+            error: null
+        };
     } catch (error) {
-        throw new Error(`Image validation failed: ${error.message}`);
+        return {
+            isValid: false,
+            error: `Image validation failed: ${error.message}`,
+            metadata: null
+        };
     }
 };
