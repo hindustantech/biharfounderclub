@@ -6,7 +6,7 @@ export const createWhiteboard = async (req, res, next) => {
         const { category, title, description, websiteurl } = req.body;
 
         // Validation
-        if (!category || !title || !description) {
+        if (!category || !title || !description || !websiteurl) {
             return res.status(400).json({
                 message: "Category, title and description are required",
             });
@@ -177,6 +177,7 @@ export const updateWhiteboard = async (req, res, next) => {
             category: req.body.category ?? post.category,
             title: req.body.title ?? post.title,
             description: req.body.description ?? post.description,
+            websiteurl: req.body.websiteurl ?? post.websiteurl,
         };
 
         const updatedPost = await Whiteboard.findByIdAndUpdate(
