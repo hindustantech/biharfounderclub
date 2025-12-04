@@ -164,7 +164,8 @@ export const deleteWhiteboard = async (req, res, next) => {
 export const updateWhiteboard = async (req, res, next) => {
     try {
         const post = await Whiteboard.findById(req.params.id);
-
+        console.log("req.params.id",req.params.id);
+        console.log("post",post);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
