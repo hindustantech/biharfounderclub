@@ -89,7 +89,7 @@ const UserProfile = new mongoose.Schema(
 
     previousExperience: {
       type: String,
-      maxlength: 100,
+     
       required: function () {
         return this.membershipType === "Mentor";
       },
@@ -105,7 +105,6 @@ const UserProfile = new mongoose.Schema(
 
     areaOfExpertise: {
       type: String,
-      maxlength: 100,
       required: function () {
         return this.membershipType === "Mentor";
       },
