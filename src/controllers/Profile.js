@@ -141,8 +141,9 @@ const validateProfileImage = async (buffer) => {
         const metadata = await validateImage(buffer, {
             minWidth: 100,
             minHeight: 100,
-            maxWidth: 2000,
-            maxHeight: 2000,
+            maxWidth: null,   // No limit
+            maxHeight: null,  // No limit
+
             maxFileSize: 10 * 1024 * 1024, // 10MB for profile images
             aspectRatio: null
         });
@@ -227,19 +228,6 @@ export const getUserDetails = async (req, res) => {
         });
     }
 };
-
-/**
- * @desc Create OR Update Profile (Auto Create if not found)
- * @route POST /api/profile
- * @access Private
- */
-// In your createOrUpdateProfile function, update the image handling section:
-
-/**
- * @desc Create OR Update Profile (Auto Create if not found)
- * @route POST /api/profile
- * @access Private
- */
 
 
 
