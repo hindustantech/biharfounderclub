@@ -51,7 +51,8 @@ const buildPaginationPipeline = (category, page, limit) => {
                     title: 1,
                     description: 1,
                     category: 1,
-                    websiteurl: 1,
+                    websiteUrl: "$websiteurl",   // <- FIX HERE
+
                     createdAt: 1,
                     updatedAt: 1,
                     creator: {
