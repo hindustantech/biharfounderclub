@@ -4,6 +4,7 @@ import { logger } from "../config/logger.js";
 import { verifyWhatsAppOtp } from "../utils/whatapp.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/authUtils.js";
 import User from "../models/User.js";
+import Profile from "../models/Profile.js";
 export const register1 = async (req, res, next) => {
     try {
         const result = await registerUser(req.body);
@@ -50,6 +51,33 @@ export const verifyOtp = async (req, res, next) => {
             });
         }
 
+
+
+        const newProfile = await Profile.create({
+            userId: user._id,
+
+            // Basic info
+            name: user.fullName,
+            phoneNumber:user.whatsappNumber,
+
+            // Default occupation to "other" (must match enum)
+            occupation: "other",
+
+            // Default membership
+            membershipType: "Individual",
+
+            // Optional fields default
+            nativeAddress: "",
+            currentAddress: "",
+            linkedinUrl: "",
+            websiteUrl: "",
+            pan: user.pan,
+
+            // Image defaults
+            image: null,
+            imagePublicId: null,
+            imageMetadata: null,
+        });
         // Generate tokens
         const accessToken = generateAccessToken(user);
         const refreshToken = generateRefreshToken(user);

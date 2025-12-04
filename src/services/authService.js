@@ -48,6 +48,8 @@ export const registerUser = async ({
     await user.save();
 
 
+  
+
 
     return {
         message: "User registered, OTP sent to WhatsApp number",

@@ -31,31 +31,7 @@ export const createUser = async (req, res, next) => {
         await newUser.save();
 
 
-        const newProfile = await Profile.create({
-            userId: newUser._id,
-
-            // Basic info
-            name: fullName,
-            phoneNumber: whatsappNumber,
-
-            // Default occupation to "other" (must match enum)
-            occupation: "other",
-
-            // Default membership
-            membershipType: "Individual",
-
-            // Optional fields default
-            nativeAddress: "",
-            currentAddress: "",
-            linkedinUrl: "",
-            websiteUrl: "",
-            pan: pan.toUpperCase(),
-
-            // Image defaults
-            image: null,
-            imagePublicId: null,
-            imageMetadata: null,
-        });
+       
 
 
         res.status(201).json({ message: "User created successfully", user: newUser, profile: newProfile });
