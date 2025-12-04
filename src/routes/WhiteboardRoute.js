@@ -12,7 +12,7 @@ const router = express.Router();
 
 router.get("/paged", protect, getWhiteboardsPaged);
 router.post("/createWhiteboard", protect, createWhiteboard);
-router.post("/updateWhiteboard", protect, updateWhiteboard);
+router.post("/updateWhiteboard/:id", protect, updateWhiteboard);
 router.delete("/:id", protect, deleteWhiteboard);
 router.get("/:id", protect, getWhiteboardById);
 export default router;
