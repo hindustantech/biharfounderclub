@@ -136,60 +136,49 @@ const isValidUrl = (url) => {
  * Validate image file
  */
 /**
- * Validate image file - NEVER FAILS, always returns result
+ * Android Mobile-Proof Image Validation (Dec 2025)
+ * Accepts real JPG + HEIC/HEIF disguised as .jpg from Android phones
  */
 const validateProfileImage = async (file) => {
     try {
-        if (!file || !file.buffer || file.buffer.length === 0) {
-            return { isValid: false, message: "No image data provided" };
+        if (!file?.buffer || file.buffer.length === 0) {
+            return { isValid: false, message: "No image provided" };
         }
 
         const buffer = file.buffer;
-        const originalname = file.originalname?.toLowerCase() || "";
+        const size = buffer.length;
         const maxSize = 10 * 1024 * 1024; // 10MB
 
-        // 1. Check file size
-        if (buffer.length > maxSize) {
+        if (size > maxSize) {
             return { isValid: false, message: "Image must be under 10MB" };
         }
 
-        // 2. Check extension
-        const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
-        const hasValidExtension = allowedExtensions.some(ext =>
-            originalname.endsWith(ext)
-        );
-        if (!hasValidExtension) {
-            return { isValid: false, message: "Only JPG, PNG, WebP, GIF allowed" };
+        // Check first 12 bytes (magic numbers)
+        const header = buffer.slice(0, 12).toString('hex').toUpperCase();
+
+        const valid =
+            header.startsWith('FFD8FF') ||                                      // JPEG
+            header.startsWith('89504E470D0A1A0A') ||                            // PNG
+            header.startsWith('52494646') && header.includes('57454250') ||     // WebP
+            header.startsWith('4749463839') || header.startsWith('4749463837') || // GIF
+            header.includes('6674797068656963') ||                              // HEIC → ftypheic
+            header.includes('6674797068656966');                                // HEIF → ftypheif
+
+        if (!valid) {
+            console.log("Invalid image header:", header.substring(0, 24));
+            return {
+                isValid: false,
+                message: "Please upload a valid image (JPG, PNG, WebP, GIF, HEIC)"
+            };
         }
 
-        // 3. Check magic bytes (most reliable way)
-        const magicBytes = buffer.subarray(0, 12).toString('hex').toUpperCase();
+        return { isValid: true, message: "Image accepted" };
 
-        const signatures = {
-            jpg: ['FFD8FFE0', 'FFD8FFE1', 'FFD8FFE2', 'FFD8FFE3', 'FFD8FFE8'], // JPEG
-            png: ['89504E47'],                                              // PNG
-            webp: ['52494646', '57454250'],                                  // RIFF....WEBP
-            gif: ['47494638'],                                              // GIF89a or GIF87a
-        };
-
-        const isJpg = signatures.jpg.some(sig => magicBytes.startsWith(sig));
-        const isPng = magicBytes.startsWith(signatures.png[0]);
-        const isWebp = magicBytes.includes('52494646') && magicBytes.includes('57454250');
-        const isGif = magicBytes.startsWith(signatures.gif[0]);
-
-        if (!isJpg && !isPng && !isWebp && !isGif) {
-            return { isValid: false, message: "File is not a valid image (corrupted or wrong format)" };
-        }
-
-        // All good!
-        return { isValid: true, message: "Image valid" };
-
-    } catch (error) {
-        console.error("Image validation error:", error);
-        return { isValid: false, message: "Failed to validate image" };
+    } catch (err) {
+        console.error("Validation crash:", err);
+        return { isValid: false, message: "Image validation failed" };
     }
 };
-
 /**
  * @desc Get user profile
  * @route GET /api/profile
@@ -270,11 +259,12 @@ export const getUserDetails = async (req, res) => {
  * @route POST /api/profile
  * @access Private
  */
+
 export const createOrUpdateProfile = async (req, res) => {
     let cloudinaryPublicId = null;
 
     try {
-        // VALIDATION (express-validator)
+        // EXPRESS VALIDATION
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({
@@ -310,11 +300,11 @@ export const createOrUpdateProfile = async (req, res) => {
         // Normalize mentorshipFields
         const normalizedFields = mentorshipFields
             ? (typeof mentorshipFields === "string"
-                ? mentorshipFields.split(",").map((f) => f.trim().toLowerCase())
-                : mentorshipFields.map((f) => f.trim().toLowerCase()))
+                ? mentorshipFields.split(",").map(f => f.trim().toLowerCase())
+                : mentorshipFields.map(f => f.trim().toLowerCase()))
             : [];
 
-        // CUSTOM INPUT VALIDATION
+        // CUSTOM FIELD VALIDATION
         const fieldValidationErrors = validateProfileFields({
             name,
             dob,
@@ -344,104 +334,55 @@ export const createOrUpdateProfile = async (req, res) => {
         // GET EXISTING PROFILE
         let existingProfile = await Profile.findOne({ userId: req.user.id });
 
-        let imageUrl = undefined;
-        let imagePublicId = undefined;
-        let imageMetadata = undefined;
+        let imageUrl, imagePublicId, imageMetadata;
 
         // -----------------------------
         // IMAGE UPLOAD / DELETE LOGIC
         // -----------------------------
         if (req.file) {
-            // VALIDATE IMAGE - This will NEVER throw an error
-            const imageValidation = await validateProfileImage(req.file.buffer);
+            try {
+                const processedBuffer = await processImage(req.file.buffer);
+                const filename = generateUniqueFilename(req.file.originalname || "profile", processedBuffer);
+                const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
 
-            if (!imageValidation.isValid) {
-                // Return the validation error but don't crash
-                console.log("Image validation warning:", imageValidation.message);
-
-                // Option 1: Return error immediately
-                return res.status(400).json({
-                    success: false,
-                    message: "Image validation failed",
-                    errors: { image: imageValidation.message }
+                const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
+                    public_id: filename.replace(/\.[^/.]+$/, ""),
+                    transformation: [
+                        { width: 500, height: 500, crop: "fill" },
+                        { quality: "auto:best" },
+                        { fetch_format: "auto" }
+                    ]
                 });
 
-                // Option 2: Continue without image (if you want to accept profile without image)
-                // console.log("Skipping image upload due to validation warning:", imageValidation.message);
-                // imageUrl = undefined;
-                // imagePublicId = undefined;
-                // imageMetadata = undefined;
-            } else {
-                // Only process and upload if validation passed
-                try {
-                    // PROCESS IMAGE (compress + resize)
-                    const processedBuffer = await processImage(req.file.buffer);
+                imageUrl = uploadResult.url;
+                imagePublicId = uploadResult.publicId;
+                imageMetadata = {
+                    format: uploadResult.format,
+                    width: uploadResult.width,
+                    height: uploadResult.height,
+                    size: uploadResult.bytes,
+                    uploadedAt: new Date().toISOString()
+                };
 
-                    const filename = generateUniqueFilename(
-                        req.file.originalname || "profile",
-                        processedBuffer
-                    );
+                cloudinaryPublicId = uploadResult.publicId;
 
-                    const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
-
-                    // UPLOAD TO CLOUDINARY
-                    const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
-                        public_id: filename.replace(/\.[^/.]+$/, ""),
-                        transformation: [
-                            { width: 500, height: 500, crop: "fill" },
-                            { quality: "auto:best" },
-                            { fetch_format: "auto" }
-                        ]
-                    });
-
-                    imageUrl = uploadResult.url;
-                    imagePublicId = uploadResult.publicId;
-
-                    imageMetadata = {
-                        format: uploadResult.format,
-                        width: uploadResult.width,
-                        height: uploadResult.height,
-                        size: uploadResult.bytes,
-                        uploadedAt: new Date().toISOString()
-                    };
-
-                    cloudinaryPublicId = uploadResult.publicId;
-
-                    // DELETE OLD IMAGE
-                    if (existingProfile?.imagePublicId) {
-                        try {
-                            await deleteFromCloudinary(existingProfile.imagePublicId);
-                        } catch (e) {
-                            console.log("Old image delete failed", e);
-                        }
-                    }
-                } catch (uploadError) {
-                    console.error("Image upload failed:", uploadError);
-                    // Don't crash the whole request - just don't set image
-                    imageUrl = undefined;
-                    imagePublicId = undefined;
-                    imageMetadata = undefined;
+                // DELETE OLD IMAGE IF EXISTS
+                if (existingProfile?.imagePublicId) {
+                    await deleteFromCloudinary(existingProfile.imagePublicId).catch(err => console.log("Old image delete failed", err));
                 }
+            } catch (uploadError) {
+                console.error("Image upload failed:", uploadError);
             }
-        }
-
-        // REMOVE IMAGE
-        else if (removeImage === "true" || removeImage === true) {
+        } else if (removeImage === "true" || removeImage === true) {
+            // DELETE EXISTING IMAGE
             if (existingProfile?.imagePublicId) {
-                try {
-                    await deleteFromCloudinary(existingProfile.imagePublicId);
-                } catch (e) {
-                    console.log("Image delete failed", e);
-                }
+                await deleteFromCloudinary(existingProfile.imagePublicId).catch(err => console.log("Image delete failed", err));
             }
-
             imageUrl = null;
             imagePublicId = null;
             imageMetadata = null;
-        }
-
-        // KEEP OLD IMAGE IF NEW NOT UPLOADED
-        else if (existingProfile) {
+        } else if (existingProfile) {
+            // KEEP OLD IMAGE
             imageUrl = existingProfile.image;
             imagePublicId = existingProfile.imagePublicId;
             imageMetadata = existingProfile.imageMetadata;
@@ -470,25 +411,19 @@ export const createOrUpdateProfile = async (req, res) => {
             mentorshipFields: normalizedFields,
             previousExperience: previousExperience?.trim(),
             areaOfExpertise: areaOfExpertise?.trim(),
-            availableForMentorship:
-                availableForMentorship === true || availableForMentorship === "true",
+            availableForMentorship: availableForMentorship === true || availableForMentorship === "true",
             lastUpdated: new Date(),
-
-            // ONLY SET IMAGE FIELDS IF THEY ARE DEFINED
             ...(imageUrl !== undefined && { image: imageUrl }),
             ...(imagePublicId !== undefined && { imagePublicId }),
             ...(imageMetadata !== undefined && { imageMetadata })
         };
 
         // REMOVE UNDEFINED FIELDS
-        Object.keys(profileData).forEach(
-            (key) => profileData[key] === undefined && delete profileData[key]
-        );
+        Object.keys(profileData).forEach(key => profileData[key] === undefined && delete profileData[key]);
 
-        // SAVE OR UPDATE PROFILE
+        // CREATE OR UPDATE PROFILE
         if (!existingProfile) {
             const newProfile = await Profile.create(profileData);
-
             return res.status(201).json({
                 success: true,
                 message: "Profile created successfully",
@@ -496,7 +431,7 @@ export const createOrUpdateProfile = async (req, res) => {
             });
         }
 
-        const updated = await Profile.findOneAndUpdate(
+        const updatedProfile = await Profile.findOneAndUpdate(
             { userId: req.user.id },
             { $set: profileData },
             { new: true, runValidators: true }
@@ -505,28 +440,25 @@ export const createOrUpdateProfile = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
-            data: updated
+            data: updatedProfile
         });
 
     } catch (error) {
         console.error("Profile update error:", error);
 
-        // DELETE IMAGE IF ERROR OCCURS AFTER UPLOAD
+        // CLEANUP IMAGE IF UPLOADED
         if (cloudinaryPublicId) {
-            try {
-                await deleteFromCloudinary(cloudinaryPublicId);
-            } catch (cleanupErr) {
-                console.error("Image cleanup failed:", cleanupErr);
-            }
+            await deleteFromCloudinary(cloudinaryPublicId).catch(err => console.error("Image cleanup failed:", err));
         }
 
         return res.status(500).json({
             success: false,
             message: "Internal server error",
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
         });
     }
 };
+
 
 /**
  * @desc Delete profile image only
