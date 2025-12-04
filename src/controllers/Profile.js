@@ -138,106 +138,57 @@ const isValidUrl = (url) => {
 /**
  * Validate image file - NEVER FAILS, always returns result
  */
-const validateProfileImage = async (buffer) => {
+const validateProfileImage = async (file) => {
     try {
-        if (!buffer || buffer.length === 0) {
-            return {
-                isValid: false,
-                message: "No image data provided",
-                metadata: null
-            };
+        if (!file || !file.buffer || file.buffer.length === 0) {
+            return { isValid: false, message: "No image data provided" };
         }
 
-        // Try to get metadata first
-        let metadata;
-        try {
-            metadata = await sharp(buffer).metadata();
-        } catch (metadataError) {
-            return {
-                isValid: false,
-                message: "Invalid image file format",
-                metadata: null
-            };
+        const buffer = file.buffer;
+        const originalname = file.originalname?.toLowerCase() || "";
+        const maxSize = 10 * 1024 * 1024; // 10MB
+
+        // 1. Check file size
+        if (buffer.length > maxSize) {
+            return { isValid: false, message: "Image must be under 10MB" };
         }
 
-        const validationOptions = {
-            minWidth: 100,
-            minHeight: 100,
-            maxWidth: null, // Changed from 5000 to null (no limit)
-            maxHeight: null, // Changed from 5000 to null (no limit)
-            maxFileSize: 10 * 1024 * 1024, // 10MB
-            aspectRatio: null
+        // 2. Check extension
+        const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+        const hasValidExtension = allowedExtensions.some(ext =>
+            originalname.endsWith(ext)
+        );
+        if (!hasValidExtension) {
+            return { isValid: false, message: "Only JPG, PNG, WebP, GIF allowed" };
+        }
+
+        // 3. Check magic bytes (most reliable way)
+        const magicBytes = buffer.subarray(0, 12).toString('hex').toUpperCase();
+
+        const signatures = {
+            jpg: ['FFD8FFE0', 'FFD8FFE1', 'FFD8FFE2', 'FFD8FFE3', 'FFD8FFE8'], // JPEG
+            png: ['89504E47'],                                              // PNG
+            webp: ['52494646', '57454250'],                                  // RIFF....WEBP
+            gif: ['47494638'],                                              // GIF89a or GIF87a
         };
 
-        // Check file size
-        if (buffer.length > validationOptions.maxFileSize) {
-            return {
-                isValid: false,
-                message: `File size exceeds ${validationOptions.maxFileSize / (1024 * 1024)}MB limit`,
-                metadata
-            };
+        const isJpg = signatures.jpg.some(sig => magicBytes.startsWith(sig));
+        const isPng = magicBytes.startsWith(signatures.png[0]);
+        const isWebp = magicBytes.includes('52494646') && magicBytes.includes('57454250');
+        const isGif = magicBytes.startsWith(signatures.gif[0]);
+
+        if (!isJpg && !isPng && !isWebp && !isGif) {
+            return { isValid: false, message: "File is not a valid image (corrupted or wrong format)" };
         }
 
-        // Check minimum dimensions
-        if (metadata.width < validationOptions.minWidth || metadata.height < validationOptions.minHeight) {
-            return {
-                isValid: false,
-                message: `Image too small. Minimum dimensions: ${validationOptions.minWidth}x${validationOptions.minHeight}px`,
-                metadata
-            };
-        }
-
-        // Check maximum dimensions if specified
-        if (validationOptions.maxWidth && metadata.width > validationOptions.maxWidth) {
-            return {
-                isValid: false,
-                message: `Image width exceeds maximum of ${validationOptions.maxWidth}px`,
-                metadata
-            };
-        }
-
-        if (validationOptions.maxHeight && metadata.height > validationOptions.maxHeight) {
-            return {
-                isValid: false,
-                message: `Image height exceeds maximum of ${validationOptions.maxHeight}px`,
-                metadata
-            };
-        }
-
-        // Check aspect ratio if specified
-        if (validationOptions.aspectRatio) {
-            const [ratioW, ratioH] = validationOptions.aspectRatio.split(':').map(Number);
-            const currentRatio = metadata.width / metadata.height;
-            const expectedRatio = ratioW / ratioH;
-            const tolerance = 0.1;
-
-            if (Math.abs(currentRatio - expectedRatio) > tolerance) {
-                return {
-                    isValid: false,
-                    message: `Image aspect ratio must be ${ratioW}:${ratioH}`,
-                    metadata
-                };
-            }
-        }
-
-        // If all checks pass
-        return {
-            isValid: true,
-            metadata,
-            message: "Image validation successful"
-        };
+        // All good!
+        return { isValid: true, message: "Image valid" };
 
     } catch (error) {
-        console.log("IMAGE VALIDATION ERROR:", error);
-
-        return {
-            isValid: false,
-            message: error.message || "Unknown image validation error",
-            metadata: null
-        };
+        console.error("Image validation error:", error);
+        return { isValid: false, message: "Failed to validate image" };
     }
 };
-
 
 /**
  * @desc Get user profile
