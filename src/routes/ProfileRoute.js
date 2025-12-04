@@ -23,7 +23,7 @@ router.use(protect);
 
 const storage = multer.memoryStorage(); // buffer create
 
-const upload = multer({
+export const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
