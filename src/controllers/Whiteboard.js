@@ -1,5 +1,6 @@
 import Whiteboard from "../models/whiteboard.js";
 import Profile from "../models/Profile.js";
+import { logger } from "../config/logger.js";
 
 export const createWhiteboard = async (req, res, next) => {
     try {
@@ -164,8 +165,8 @@ export const deleteWhiteboard = async (req, res, next) => {
 export const updateWhiteboard = async (req, res, next) => {
     try {
         const post = await Whiteboard.findById(req.params.id);
-        console.log("req.params.id",req.params.id);
-        console.log("post",post);
+        logger.info("req.params.id",req.params.id);
+        logger.info("post",post);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
