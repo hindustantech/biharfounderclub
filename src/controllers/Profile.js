@@ -240,20 +240,25 @@ export const getUserDetails = async (req, res) => {
  * @route POST /api/profile
  * @access Private
  */
+
+
+
+/**
+ * @desc Create OR Update Profile (Auto Create if not found)
+ * @route POST /api/profile
+ * @access Private
+ */
 export const createOrUpdateProfile = async (req, res) => {
     let cloudinaryPublicId = null;
 
     try {
-        // Express-validator results
+        // VALIDATION (express-validator)
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({
                 success: false,
                 message: "Validation failed",
-                errors: errors.array().map(err => ({
-                    field: err.param,
-                    message: err.msg
-                }))
+                errors: errors.array()
             });
         }
 
@@ -277,11 +282,17 @@ export const createOrUpdateProfile = async (req, res) => {
             previousExperience,
             areaOfExpertise,
             availableForMentorship = false,
+            removeImage = false
         } = req.body;
 
-        // -------------------------
-        // VALIDATE INPUT FIELDS
-        // -------------------------
+        // Normalize mentorshipFields
+        const normalizedFields = mentorshipFields
+            ? (typeof mentorshipFields === "string"
+                ? mentorshipFields.split(",").map((f) => f.trim().toLowerCase())
+                : mentorshipFields.map((f) => f.trim().toLowerCase()))
+            : [];
+
+        // CUSTOM INPUT VALIDATION
         const fieldValidationErrors = validateProfileFields({
             name,
             dob,
@@ -294,11 +305,7 @@ export const createOrUpdateProfile = async (req, res) => {
             occupationDescription,
             supportStageMessage,
             membershipType,
-            mentorshipFields: mentorshipFields ?
-                (typeof mentorshipFields === 'string' ?
-                    mentorshipFields.split(',').map(f => f.trim()) :
-                    mentorshipFields
-                ) : [],
+            mentorshipFields: normalizedFields,
             previousExperience,
             areaOfExpertise,
             availableForMentorship
@@ -312,230 +319,169 @@ export const createOrUpdateProfile = async (req, res) => {
             });
         }
 
-        let imageUrl = null;
-        let imagePublicId = null;
-        let imageMetadata = null;
+        // GET EXISTING PROFILE
+        let existingProfile = await Profile.findOne({ userId: req.user.id });
 
-        // -------------------------
-        // IMAGE HANDLING
-        // -------------------------
+        let imageUrl = undefined;
+        let imagePublicId = undefined;
+        let imageMetadata = undefined;
+
+        // -----------------------------
+        // IMAGE UPLOAD / DELETE LOGIC
+        // -----------------------------
         if (req.file) {
-            try {
-                // Validate image
-                const imageValidation = await validateProfileImage(req.file.buffer);
-                if (!imageValidation.isValid) {
-                    return res.status(400).json({
-                        success: false,
-                        message: "Image validation failed",
-                        errors: { image: imageValidation.message }
-                    });
-                }
-
-                // Process image (resize, compress, convert to WebP)
-                const processedBuffer = await processImage(req.file.buffer);
-
-                // Generate unique filename
-                const filename = generateUniqueFilename(
-                    req.file.originalname || 'profile',
-                    processedBuffer
-                );
-
-                // Upload to Cloudinary
-                const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
-                const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
-                    public_id: filename.replace(/\.[^/.]+$/, ""),
-                    transformation: [
-                        { width: 500, height: 500, crop: 'fill' },
-                        { quality: 'auto:best' },
-                        { fetch_format: 'auto' }
-                    ]
-                });
-
-                // CRITICAL FIX: Extract just the URL string, not the entire object
-                imageUrl = uploadResult.url; // This should be just the URL string
-                imagePublicId = uploadResult.publicId; // This is separate field
-                imageMetadata = {
-                    format: uploadResult.format,
-                    width: uploadResult.width,
-                    height: uploadResult.height,
-                    size: uploadResult.bytes,
-                    uploadedAt: new Date().toISOString()
-                };
-
-                cloudinaryPublicId = imagePublicId;
-
-            } catch (uploadError) {
-                console.error("❌ Cloudinary upload error:", uploadError);
-                return res.status(500).json({
+            // VALIDATE IMAGE
+            const imageValidation = await validateProfileImage(req.file.buffer);
+            if (!imageValidation.isValid) {
+                return res.status(400).json({
                     success: false,
-                    message: "Failed to upload profile image",
-                    error: uploadError.message
+                    message: "Image validation failed",
+                    errors: { image: imageValidation.message }
                 });
+            }
+
+            // PROCESS IMAGE (compress + resize)
+            const processedBuffer = await processImage(req.file.buffer);
+
+            const filename = generateUniqueFilename(
+                req.file.originalname || "profile",
+                processedBuffer
+            );
+
+            const folder = `profiles/${new Date().getFullYear()}/${new Date().getMonth() + 1}`;
+
+            // UPLOAD TO CLOUDINARY
+            const uploadResult = await uploadToCloudinary(processedBuffer, folder, {
+                public_id: filename.replace(/\.[^/.]+$/, ""),
+                transformation: [
+                    { width: 500, height: 500, crop: "fill" },
+                    { quality: "auto:best" },
+                    { fetch_format: "auto" }
+                ]
+            });
+
+            imageUrl = uploadResult.url;
+            imagePublicId = uploadResult.publicId;
+
+            imageMetadata = {
+                format: uploadResult.format,
+                width: uploadResult.width,
+                height: uploadResult.height,
+                size: uploadResult.bytes,
+                uploadedAt: new Date().toISOString()
+            };
+
+            cloudinaryPublicId = uploadResult.publicId;
+
+            // DELETE OLD IMAGE
+            if (existingProfile?.imagePublicId) {
+                try {
+                    await deleteFromCloudinary(existingProfile.imagePublicId);
+                } catch (e) {
+                    console.log("Old image delete failed", e);
+                }
             }
         }
 
-        // Prepare profile data - MAKE SURE IMAGE IS JUST A STRING
+        // REMOVE IMAGE
+        else if (removeImage === "true" || removeImage === true) {
+            if (existingProfile?.imagePublicId) {
+                try {
+                    await deleteFromCloudinary(existingProfile.imagePublicId);
+                } catch (e) {
+                    console.log("Image delete failed", e);
+                }
+            }
+
+            imageUrl = null;
+            imagePublicId = null;
+            imageMetadata = null;
+        }
+
+        // KEEP OLD IMAGE IF NEW NOT UPLOADED
+        else if (existingProfile) {
+            imageUrl = existingProfile.image;
+            imagePublicId = existingProfile.imagePublicId;
+            imageMetadata = existingProfile.imageMetadata;
+        }
+
+        // -----------------------------
+        // PREPARE DATA
+        // -----------------------------
         const profileData = {
             userId: req.user.id,
             name: name?.trim(),
-            // CRITICAL: Save only the URL string in the 'image' field
-            image: imageUrl, // This must be a string, not an object
-            imagePublicId: imagePublicId, // Store Cloudinary public ID separately
-            imageMetadata: imageMetadata, // Store metadata separately
             dob: dob ? new Date(dob) : undefined,
             nativeAddress: nativeAddress?.trim(),
             currentAddress: currentAddress?.trim(),
             phoneCountryCode: phoneCountryCode?.trim() || "+91",
             phoneNumber: phoneNumber?.trim(),
             whatsappNumber: whatsappNumber?.trim(),
-            email: email?.trim().toLowerCase(),
-            pan: pan?.trim().toUpperCase(),
+            email: email?.trim()?.toLowerCase(),
+            pan: pan?.trim()?.toUpperCase(),
             linkedinUrl: linkedinUrl?.trim(),
             websiteUrl: websiteUrl?.trim(),
             occupation: occupation?.trim(),
             occupationDescription: occupationDescription?.trim(),
             supportStageMessage: supportStageMessage?.trim(),
             membershipType: membershipType?.trim(),
-            mentorshipFields: mentorshipFields ?
-                (typeof mentorshipFields === 'string' ?
-                    mentorshipFields.split(',').map(f => f.trim().toLowerCase()) :
-                    mentorshipFields.map(f => f.trim().toLowerCase())
-                ) : [],
+            mentorshipFields: normalizedFields,
             previousExperience: previousExperience?.trim(),
             areaOfExpertise: areaOfExpertise?.trim(),
-            availableForMentorship: availableForMentorship === true || availableForMentorship === 'true',
-            lastUpdated: new Date()
+            availableForMentorship:
+                availableForMentorship === true || availableForMentorship === "true",
+            lastUpdated: new Date(),
+
+            // ONLY SET IMAGE FIELDS IF THEY ARE DEFINED
+            ...(imageUrl !== undefined && { image: imageUrl }),
+            ...(imagePublicId !== undefined && { imagePublicId }),
+            ...(imageMetadata !== undefined && { imageMetadata })
         };
 
-        // Debug log to check data structure
-        console.log("Profile data to save:", {
-            image: typeof profileData.image,
-            imagePublicId: typeof profileData.imagePublicId,
-            imageMetadata: typeof profileData.imageMetadata
-        });
-
-        // Remove undefined values for clean update
+        // REMOVE UNDEFINED FIELDS
         Object.keys(profileData).forEach(
             (key) => profileData[key] === undefined && delete profileData[key]
         );
 
-        // Check existing profile
-        let existingProfile = await Profile.findOne({ userId: req.user.id });
-
-        // Delete old image from Cloudinary if new image is uploaded
-        if (existingProfile && existingProfile.imagePublicId && imagePublicId) {
-            try {
-                await deleteFromCloudinary(existingProfile.imagePublicId);
-            } catch (deleteError) {
-                console.warn("⚠️ Could not delete old profile image:", deleteError.message);
-                // Continue anyway - new image is already uploaded
-            }
-        }
-
+        // SAVE OR UPDATE PROFILE
         if (!existingProfile) {
-            // Create new profile
-            const newProfile = new Profile(profileData);
-            await newProfile.save();
+            const newProfile = await Profile.create(profileData);
 
             return res.status(201).json({
                 success: true,
                 message: "Profile created successfully",
-                data: {
-                    ...newProfile.toObject(),
-                    // Make sure we're returning string URL to frontend
-                    image: newProfile.image // Should be string URL
-                }
+                data: newProfile
             });
         }
 
-        // Update existing profile
-        const updatedProfile = await Profile.findOneAndUpdate(
+        const updated = await Profile.findOneAndUpdate(
             { userId: req.user.id },
             { $set: profileData },
-            {
-                new: true,
-                runValidators: true,
-                context: 'query'
-            }
-        ).select("-__v");
-
-        // Verify the image field is a string
-        if (updatedProfile && typeof updatedProfile.image !== 'string' && updatedProfile.image !== null) {
-            console.error("❌ Image field is not a string:", updatedProfile.image);
-            // Convert to string if it's an object
-            if (typeof updatedProfile.image === 'object' && updatedProfile.image.url) {
-                await Profile.updateOne(
-                    { _id: updatedProfile._id },
-                    { $set: { image: updatedProfile.image.url } }
-                );
-                updatedProfile.image = updatedProfile.image.url;
-            }
-        }
+            { new: true, runValidators: true }
+        );
 
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
-            data: updatedProfile
+            data: updated
         });
 
     } catch (error) {
-        console.error("❌ Error in createOrUpdateProfile:", error);
+        console.error("Profile update error:", error);
 
-        // Clean up uploaded image if error occurred
+        // DELETE IMAGE IF ERROR OCCURS AFTER UPLOAD
         if (cloudinaryPublicId) {
             try {
                 await deleteFromCloudinary(cloudinaryPublicId);
-            } catch (cleanupError) {
-                console.error("❌ Failed to cleanup uploaded image:", cleanupError);
+            } catch (cleanupErr) {
+                console.error("Image cleanup failed:", cleanupErr);
             }
         }
 
-        // Handle CastError specifically for image field
-        if (error.name === "CastError" && error.path === "image") {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid image data format",
-                error: "Image must be a URL string"
-            });
-        }
-
-        // Handle duplicate key errors
-        if (error.code === 11000) {
-            return res.status(409).json({
-                success: false,
-                message: "Duplicate field value entered",
-                duplicateField: Object.keys(error.keyValue),
-                error: "A profile with this information already exists"
-            });
-        }
-
-        // Handle validation errors
-        if (error.name === "ValidationError") {
-            const errors = Object.values(error.errors).reduce((acc, curr) => {
-                acc[curr.path] = curr.message;
-                return acc;
-            }, {});
-
-            return res.status(400).json({
-                success: false,
-                message: "Schema validation failed",
-                errors
-            });
-        }
-
-        // Handle CastError (invalid ObjectId, Date, etc.)
-        if (error.name === "CastError") {
-            return res.status(400).json({
-                success: false,
-                message: `Invalid ${error.path}: ${error.value}`,
-                error: "Invalid data format"
-            });
-        }
-
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Internal server error",
-            error: process.env.NODE_ENV === "development" ? error.message : undefined
+            error: error.message
         });
     }
 };

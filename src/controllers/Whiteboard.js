@@ -3,7 +3,7 @@ import Profile from "../models/Profile.js";
 
 export const createWhiteboard = async (req, res, next) => {
     try {
-        const { category, title, description } = req.body;
+        const { category, title, description, websiteurl } = req.body;
 
         // Validation
         if (!category || !title || !description) {
@@ -15,6 +15,7 @@ export const createWhiteboard = async (req, res, next) => {
         const post = await Whiteboard.create({
             category,
             title,
+            websiteurl,
             description,
             createdBy: req.user.id,
         });

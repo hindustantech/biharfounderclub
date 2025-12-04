@@ -24,7 +24,9 @@ const whiteboardSchema = new mongoose.Schema(
             minlength: [10, "Description must be at least 10 characters"],
             maxlength: 5000,
         },
-
+        websiteurl: {
+            type: String,
+        },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
