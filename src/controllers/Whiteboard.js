@@ -4,10 +4,10 @@ import { logger } from "../config/logger.js";
 
 export const createWhiteboard = async (req, res, next) => {
     try {
-        const { category, title, description, websiteurl } = req.body;
+        const { category, title, description, websiteUrl } = req.body;
 
         // Validation
-        if (!category || !title || !description || !websiteurl) {
+        if (!category || !title || !description || !websiteUrl) {
             return res.status(400).json({
                 message: "Category, title and description are required",
             });
@@ -16,7 +16,7 @@ export const createWhiteboard = async (req, res, next) => {
         const post = await Whiteboard.create({
             category,
             title,
-            websiteurl,
+            websiteurl:websiteUrl,
             description,
             createdBy: req.user.id,
         });
