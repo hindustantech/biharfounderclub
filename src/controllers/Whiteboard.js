@@ -16,7 +16,7 @@ export const createWhiteboard = async (req, res, next) => {
         const post = await Whiteboard.create({
             category,
             title,
-            websiteurl:websiteUrl,
+            websiteurl: websiteUrl,
             description,
             createdBy: req.user.id,
         });
@@ -35,25 +35,26 @@ const buildPaginationPipeline = (category, page, limit) => {
 
     return {
         data: [
-            { $match: { category } },
+            { $match: { category, status: "active" } }, // ✅ Only get active
             { $sort: { createdAt: -1 } },
+
             // Join with Profile
             {
                 $lookup: {
-                    from: "profiles", // MongoDB collection name
+                    from: "profiles",
                     localField: "createdBy",
                     foreignField: "userId",
                     as: "creatorProfile",
-                }
+                },
             },
             { $unwind: { path: "$creatorProfile", preserveNullAndEmptyArrays: true } },
+
             {
                 $project: {
                     title: 1,
                     description: 1,
                     category: 1,
-                    websiteUrl: "$websiteurl",   // <- FIX HERE
-
+                    websiteUrl: "$websiteurl", // ✅ corrected field name
                     createdAt: 1,
                     updatedAt: 1,
                     creator: {
@@ -61,18 +62,20 @@ const buildPaginationPipeline = (category, page, limit) => {
                         email: "$creatorProfile.email",
                         linkedinUrl: "$creatorProfile.linkedinUrl",
                         websiteUrl: "$creatorProfile.websiteUrl",
-                    }
-                }
+                    },
+                },
             },
             { $skip: skip },
-            { $limit: limit }
+            { $limit: limit },
         ],
+
         count: [
-            { $match: { category } },
-            { $count: "total" }
-        ]
+            { $match: { category, status: "active" } }, // ✅ Match only active for count
+            { $count: "total" },
+        ],
     };
 };
+
 
 export const getWhiteboardsPaged = async (req, res, next) => {
     try {
@@ -165,8 +168,8 @@ export const deleteWhiteboard = async (req, res, next) => {
 export const updateWhiteboard = async (req, res, next) => {
     try {
         const post = await Whiteboard.findById(req.params.id);
-        logger.info("req.params.id",req.params.id);
-        logger.info("post",post);
+        logger.info("req.params.id", req.params.id);
+        logger.info("post", post);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
