@@ -135,14 +135,54 @@ export const getWhiteboardsPaged = async (req, res, next) => {
 
 export const getWhiteboardById = async (req, res, next) => {
     try {
-        const post = await Whiteboard.findById(req.params.id);
+        const { id } = req.params;
 
-        if (!post) {
-            return res.status(404).json({ message: "Post not found" });
+        const objectId = new mongoose.Types.ObjectId(id);
+
+        // Build aggregation pipeline for single whiteboard
+        const pipeline = [
+            { $match: { _id: objectId, status: "active" } },
+
+            // Join with Profile collection
+            {
+                $lookup: {
+                    from: "profiles",
+                    localField: "createdBy",
+                    foreignField: "userId",
+                    as: "creatorProfile",
+                },
+            },
+            { $unwind: { path: "$creatorProfile", preserveNullAndEmptyArrays: true } },
+
+            // Project only useful fields
+            {
+                $project: {
+                    _id: 1,
+                    title: 1,
+                    description: 1,
+                    category: 1,
+                    websiteUrl: "$websiteurl",
+                    createdAt: 1,
+                    updatedAt: 1,
+                    creator: {
+                        email: "$creatorProfile.email",
+                        image: "$creatorProfile.image",
+                        linkedinUrl: "$creatorProfile.linkedinUrl",
+                        websiteUrl: "$creatorProfile.websiteUrl",
+                    },
+                },
+            },
+        ];
+
+        const result = await Whiteboard.aggregate(pipeline);
+
+        if (!result || result.length === 0) {
+            return res.status(404).json({ success: false, message: "Post not found" });
         }
 
-        res.status(200).json(post);
+        res.status(200).json(result[0]);
     } catch (error) {
+        console.error("Whiteboard Fetch Error:", error);
         next(error);
     }
 };
