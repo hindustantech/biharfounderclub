@@ -10,7 +10,7 @@ import {
 } from "../controllers/Whiteboard.js";
 const router = express.Router();
 
-router.get("/paged", protect, getWhiteboardsPaged);
+router.get("/paged", getWhiteboardsPaged);
 router.post("/createWhiteboard", protect, createWhiteboard);
 router.post("/updateWhiteboard/:id", protect, updateWhiteboard);
 router.delete("/:id", protect, deleteWhiteboard);
