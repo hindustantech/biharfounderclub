@@ -2,22 +2,75 @@ import Whiteboard from "../models/whiteboard.js";
 import Profile from "../models/Profile.js";
 import { logger } from "../config/logger.js";
 
+import {
+    processImage,
+    uploadToCloudinary,
+    validateImage,
+    generateUniqueFilename,
+} from "../config/imageUpload.js";
+
 export const createWhiteboard = async (req, res, next) => {
     try {
         const { category, title, description, websiteUrl } = req.body;
 
-        // Validation
+        // Basic validation
         if (!category || !title || !description || !websiteUrl) {
             return res.status(400).json({
-                message: "Category, title and description are required",
+                message: "Category, title, description and websiteUrl are required",
             });
         }
 
+        let imageData = null;
+
+        // 🖼️ If image is provided
+        if (req.file) {
+            // 1️⃣ Validate image
+            const validation = await validateImage(req.file.buffer, {
+                minWidth: 300,
+                minHeight: 300,
+                maxWidth: 5000,
+                maxHeight: 5000,
+                maxFileSize: 10 * 1024 * 1024, // 10MB
+            });
+
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    message: validation.error,
+                });
+            }
+
+            // 2️⃣ Optimize image
+            const optimizedBuffer = await processImage(req.file.buffer);
+
+            // 3️⃣ Upload to Cloudinary
+            const uploaded = await uploadToCloudinary(
+                optimizedBuffer,
+                "whiteboards",
+                {
+                    public_id: generateUniqueFilename(
+                        req.file.originalname,
+                        optimizedBuffer
+                    ),
+                }
+            );
+
+            imageData = {
+                url: uploaded.url,
+                publicId: uploaded.publicId,
+                width: uploaded.width,
+                height: uploaded.height,
+                bytes: uploaded.bytes,
+                format: uploaded.format,
+            };
+        }
+
+        // 4️⃣ Save Whiteboard
         const post = await Whiteboard.create({
             category,
             title,
-            websiteurl: websiteUrl,
             description,
+            websiteurl: websiteUrl,
+            image: imageData, // can be null
             createdBy: req.user.id,
         });
 
@@ -205,24 +258,77 @@ export const deleteWhiteboard = async (req, res, next) => {
         next(error);
     }
 };
+
+
 export const updateWhiteboard = async (req, res, next) => {
     try {
         const post = await Whiteboard.findById(req.params.id);
-        logger.info("req.params.id", req.params.id);
-        logger.info("post", post);
+
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
 
+        // 🔐 Authorization
         if (post.createdBy.toString() !== req.user.id) {
             return res.status(403).json({ message: "Unauthorized to update this post" });
         }
 
+        let imageData = post.image || null;
+
+        // 🖼️ If new image is uploaded
+        if (req.file) {
+            // 1️⃣ Validate image
+            const validation = await validateImage(req.file.buffer, {
+                minWidth: 300,
+                minHeight: 300,
+                maxWidth: 5000,
+                maxHeight: 5000,
+                maxFileSize: 10 * 1024 * 1024, // 10MB
+            });
+
+            if (!validation.isValid) {
+                return res.status(400).json({
+                    message: validation.error,
+                });
+            }
+
+            // 2️⃣ Optimize image
+            const optimizedBuffer = await processImage(req.file.buffer);
+
+            // 3️⃣ Upload new image
+            const uploaded = await uploadToCloudinary(
+                optimizedBuffer,
+                "whiteboards",
+                {
+                    public_id: generateUniqueFilename(
+                        req.file.originalname,
+                        optimizedBuffer
+                    ),
+                }
+            );
+
+            // 4️⃣ Delete old image (if exists)
+            if (post.image?.publicId) {
+                await deleteFromCloudinary(post.image.publicId);
+            }
+
+            imageData = {
+                url: uploaded.url,
+                publicId: uploaded.publicId,
+                width: uploaded.width,
+                height: uploaded.height,
+                bytes: uploaded.bytes,
+                format: uploaded.format,
+            };
+        }
+
+        // 📝 Update fields (partial update)
         const updates = {
             category: req.body.category ?? post.category,
             title: req.body.title ?? post.title,
             description: req.body.description ?? post.description,
             websiteurl: req.body.websiteurl ?? post.websiteurl,
+            image: imageData,
         };
 
         const updatedPost = await Whiteboard.findByIdAndUpdate(

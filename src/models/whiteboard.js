@@ -1,4 +1,5 @@
 // models/Whiteboard.js
+import { string } from "joi";
 import mongoose from "mongoose";
 
 const whiteboardSchema = new mongoose.Schema(
@@ -32,7 +33,10 @@ const whiteboardSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        image: {
+            type: String
 
+        },
         // Admin specific fields
         status: {
             type: String,
