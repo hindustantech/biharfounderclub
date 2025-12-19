@@ -12,7 +12,7 @@ import {
 export const createWhiteboard = async (req, res, next) => {
     try {
         const { category, title, description, websiteUrl } = req.body;
-        logger.info("data boady",{ category, title, description, websiteUrl })
+        logger.info("data boady", { category, title, description, websiteUrl })
         // Basic validation
         if (!category || !title || !description || !websiteUrl) {
             return res.status(400).json({
@@ -101,13 +101,13 @@ const buildPaginationPipeline = (category, page, limit) => {
                 },
             },
             { $unwind: { path: "$creatorProfile", preserveNullAndEmptyArrays: true } },
-                    
+
             {
                 $project: {
                     title: 1,
                     description: 1,
                     category: 1,
-                    image:1,
+                    image: 1,
                     websiteUrl: "$websiteurl", // ✅ corrected field name
                     createdAt: 1,
                     updatedAt: 1,
@@ -214,7 +214,7 @@ export const getWhiteboardById = async (req, res, next) => {
                     _id: 1,
                     title: 1,
                     description: 1,
-                    image:1,
+                    image: 1,
                     category: 1,
                     websiteUrl: "$websiteurl",
                     createdAt: 1,
@@ -242,6 +242,90 @@ export const getWhiteboardById = async (req, res, next) => {
     }
 };
 
+
+
+export const getRelatedWhiteboards = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const objectId = new mongoose.Types.ObjectId(id);
+
+        // 1️⃣ Get current whiteboard to know its category
+        const current = await Whiteboard.findOne({
+            _id: objectId,
+            status: "active",
+        }).select("category");
+
+        if (!current) {
+            return res.status(404).json({
+                success: false,
+                message: "Whiteboard not found",
+            });
+        }
+
+        // 2️⃣ Aggregation for related whiteboards
+        const pipeline = [
+            {
+                $match: {
+                    _id: { $ne: objectId },
+                    category: current.category,
+                    status: "active",
+                },
+            },
+
+            // Join profile
+            {
+                $lookup: {
+                    from: "profiles",
+                    localField: "createdBy",
+                    foreignField: "userId",
+                    as: "creatorProfile",
+                },
+            },
+            {
+                $unwind: {
+                    path: "$creatorProfile",
+                    preserveNullAndEmptyArrays: true,
+                },
+            },
+
+            // Project fields
+            {
+                $project: {
+                    _id: 1,
+                    title: 1,
+                    description: 1,
+                    category: 1,
+                    image: 1,
+                    websiteUrl: "$websiteurl",
+                    createdAt: 1,
+                    creator: {
+                        email: "$creatorProfile.email",
+                        image: "$creatorProfile.image",
+                        linkedinUrl: "$creatorProfile.linkedinUrl",
+                        websiteUrl: "$creatorProfile.websiteUrl",
+                    },
+                },
+            },
+
+            // Optional: latest first
+            { $sort: { createdAt: -1 } },
+
+            // Limit related posts
+            { $limit: 6 },
+        ];
+
+        const related = await Whiteboard.aggregate(pipeline);
+
+        res.status(200).json({
+            success: true,
+            data: related,
+        });
+    } catch (error) {
+        console.error("Related Whiteboards Error:", error);
+        next(error);
+    }
+};
 
 export const deleteWhiteboard = async (req, res, next) => {
     try {

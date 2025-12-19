@@ -5,7 +5,8 @@ import {
     updateWhiteboard,
     getWhiteboardsPaged,
     getWhiteboardById,
-    deleteWhiteboard
+    deleteWhiteboard,
+    getRelatedWhiteboards
 
 } from "../controllers/Whiteboard.js";
 import multer from "multer";
@@ -23,5 +24,6 @@ router.post("/createWhiteboard", protect, upload.single("image"), createWhiteboa
 router.post("/updateWhiteboard/:id", protect, upload.single("image"), updateWhiteboard);
 router.delete("/:id", protect, deleteWhiteboard);
 router.get("/:id", getWhiteboardById);
+router.get("getRelatedWhiteboards/:id", getRelatedWhiteboards);
 export default router;
 
