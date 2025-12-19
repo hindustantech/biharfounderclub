@@ -214,6 +214,7 @@ export const getWhiteboardById = async (req, res, next) => {
                     _id: 1,
                     title: 1,
                     description: 1,
+                    image:1,
                     category: 1,
                     websiteUrl: "$websiteurl",
                     createdAt: 1,

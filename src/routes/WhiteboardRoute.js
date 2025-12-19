@@ -22,6 +22,6 @@ router.get("/paged", getWhiteboardsPaged);
 router.post("/createWhiteboard", protect, upload.single("image"), createWhiteboard);
 router.post("/updateWhiteboard/:id", protect, upload.single("image"), updateWhiteboard);
 router.delete("/:id", protect, deleteWhiteboard);
-router.get("/:id", protect, getWhiteboardById);
+router.get("/:id", getWhiteboardById);
 export default router;
 
