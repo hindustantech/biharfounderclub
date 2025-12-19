@@ -1,7 +1,7 @@
 import Whiteboard from "../models/whiteboard.js";
 import Profile from "../models/Profile.js";
 import { logger } from "../config/logger.js";
-
+import mongoose from "mongoose";
 import {
     processImage,
     uploadToCloudinary,
@@ -12,7 +12,7 @@ import {
 export const createWhiteboard = async (req, res, next) => {
     try {
         const { category, title, description, websiteUrl } = req.body;
-
+        logger.info("data boady",{ category, title, description, websiteUrl })
         // Basic validation
         if (!category || !title || !description || !websiteUrl) {
             return res.status(400).json({
@@ -101,12 +101,13 @@ const buildPaginationPipeline = (category, page, limit) => {
                 },
             },
             { $unwind: { path: "$creatorProfile", preserveNullAndEmptyArrays: true } },
-
+                    
             {
                 $project: {
                     title: 1,
                     description: 1,
                     category: 1,
+                    image:1,
                     websiteUrl: "$websiteurl", // ✅ corrected field name
                     createdAt: 1,
                     updatedAt: 1,
