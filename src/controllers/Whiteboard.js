@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import {
     processImage,
     uploadToCloudinary,
+    deleteFromCloudinary,
     validateImage,
     generateUniqueFilename,
 } from "../config/imageUpload.js";

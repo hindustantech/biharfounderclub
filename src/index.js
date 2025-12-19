@@ -19,6 +19,10 @@ import whiteb from './routes/whiteboard.routes.js'
 import mentro from './routes/MentroRoute.js'
 import dashboard from './routes/dashboardRoutes.js'
 
+// ✅ Add these imports for OG routes
+import ogRoutes from "./routes/ogRoutes.js";
+import ogImageRoutes from "./routes/ogImageRoutes.js";
+
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,7 +40,7 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.set('trust proxy', 1); 
+app.set('trust proxy', 1);
 
 
 app.use("/api/auth", authRoutes);
@@ -48,6 +52,14 @@ app.use("/api/admin", adminprofile);
 app.use("/api/whiteb", whiteb);
 app.use("/api/mentro", mentro);
 app.use("/api/dashboard", dashboard);
+
+
+app.use("/og-images", express.static("public/og-images"));
+
+// ✅ Add your OG routes
+app.use("/api/og", ogRoutes); // For Facebook, LinkedIn metadata HTML
+app.use("/api/og-image", ogImageRoutes); // For image generation & Instagram
+
 
 app.get("/", (req, res) => {
     res.send("bihari founder club API is running");

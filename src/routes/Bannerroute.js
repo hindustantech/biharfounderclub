@@ -18,10 +18,10 @@ const validateCreate = validateBanner('create');
 const validateUpdate = validateBanner('update');
 
 // Routes - SIMPLIFIED
+router.put("/:id", upload.single("image"), validateUpdate, updateBanner);
 router.post('/', upload.single('image'), validateCreate, createBanner);  // Direct upload
 router.get("/", getBanners);
 router.get("/:id", getBannerById);
-router.put("/:id", upload.single("image"), validateUpdate, updateBanner);
 router.delete("/:id", deleteBanner);
 router.patch("/:id/toggle", toggleBannerStatus);
 
