@@ -20,8 +20,8 @@ import mentro from './routes/MentroRoute.js'
 import dashboard from './routes/dashboardRoutes.js'
 
 // ✅ Add these imports for OG routes
-import ogRoutes from "./routes/ogRoutes.js";
-import ogImageRoutes from "./routes/ogImageRoutes.js";
+// import ogRoutes from "./routes/ogRoutes.js";
+// import ogImageRoutes from "./routes/ogImageRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -57,8 +57,8 @@ app.use("/api/dashboard", dashboard);
 app.use("/og-images", express.static("public/og-images"));
 
 // ✅ Add your OG routes
-app.use("/api/og", ogRoutes); // For Facebook, LinkedIn metadata HTML
-app.use("/api/og-image", ogImageRoutes); // For image generation & Instagram
+// app.use("/api/og", ogRoutes); // For Facebook, LinkedIn metadata HTML
+// app.use("/api/og-image", ogImageRoutes); // For image generation & Instagram
 
 
 app.get("/", (req, res) => {
