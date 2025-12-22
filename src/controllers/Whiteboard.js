@@ -31,7 +31,7 @@ export const createWhiteboard = async (req, res, next) => {
                 minHeight: 300,
                 maxWidth: 5000,
                 maxHeight: 5000,
-                maxFileSize: 10 * 1024 * 1024, // 10MB
+                maxFileSize: 2 * 1024 * 1024, // 2MB
             });
 
             if (!validation.isValid) {
