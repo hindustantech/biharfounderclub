@@ -55,7 +55,7 @@ app.use("/api/admin", adminprofile);
 app.use("/api/whiteb", whiteb);
 app.use("/api/mentro", mentro);
 app.use("/api/dashboard", dashboard);
-app.use("api/mentor-interest", mentorreques);
+app.use("/api/mentor-interest", mentorreques);
 
 
 app.use("/og-images", express.static("public/og-images"));
