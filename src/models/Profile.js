@@ -34,7 +34,7 @@ const UserProfile = new mongoose.Schema(
 
     // Contact Details
     phoneCountryCode: { type: String, default: "+91" },
-    phoneNumber: { type: String, required: true },
+    phoneNumber: { type: String, },
     whatsappNumber: { type: String },
     email: { type: String, },
 
