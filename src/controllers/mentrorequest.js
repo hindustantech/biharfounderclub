@@ -29,7 +29,7 @@ export const createMentorRequest = async (req, res) => {
         ============================ */
         const [user, mentor] = await Promise.all([
             Profile.findOne({ userId }).select("name email"),
-            Profile.findOne({ userId: mentorId }).select("name email"),
+            Profile.findById(mentorId ).select("name email"),
         ]);
 
         if (!user) {
