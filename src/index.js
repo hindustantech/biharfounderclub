@@ -18,6 +18,7 @@ import adminprofile from './routes/profile.js'
 import whiteb from './routes/whiteboard.routes.js'
 import mentro from './routes/MentroRoute.js'
 import dashboard from './routes/dashboardRoutes.js'
+import mentorreques from "./routes/mentrorequest.js";
 
 // ✅ Add these imports for OG routes
 // import ogRoutes from "./routes/ogRoutes.js";
@@ -54,6 +55,7 @@ app.use("/api/admin", adminprofile);
 app.use("/api/whiteb", whiteb);
 app.use("/api/mentro", mentro);
 app.use("/api/dashboard", dashboard);
+app.use("api/mentor-interest", mentorreques);
 
 
 app.use("/og-images", express.static("public/og-images"));
